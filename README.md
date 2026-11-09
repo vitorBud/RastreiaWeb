@@ -57,6 +57,24 @@ npm run dev
 - API: `http://localhost:3333`
 - Verificação da API: `http://localhost:3333/api/health`
 
+### Validação segura de URL
+
+O primeiro endpoint do back-end valida uma URL sem abrir a página:
+
+```http
+POST /api/urls/validate
+Content-Type: application/json
+
+{
+  "url": "https://exemplo.com.br"
+}
+```
+
+Ele aceita apenas HTTP e HTTPS, bloqueia credenciais, portas fora do escopo,
+hostnames locais e endereços IP privados ou reservados. A validação também
+confere todos os endereços retornados pelo DNS. Redirecionamentos precisarão
+passar pelas mesmas regras quando a navegação for implementada.
+
 ## Qualidade
 
 ```bash
