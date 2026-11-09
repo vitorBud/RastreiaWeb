@@ -65,3 +65,39 @@ describe('POST /api/urls/validate', () => {
     });
   });
 });
+
+describe('POST /api/audits', () => {
+  it('devolve o relatório produzido pelo motor de auditoria', async () => {
+    const report = {
+      analyzedAt: '2026-11-09T12:00:00.000Z',
+      disclaimer: 'Análise automática.',
+      durationMs: 420,
+      finalUrl: 'https://example.com/',
+      initialUrl: 'https://example.com',
+      issues: [],
+      limits: { maxLinks: 20, maxResources: 20 },
+      pageTitle: 'Example Domain',
+      summary: {
+        brokenLinks: 0,
+        failedResources: 0,
+        imagesFound: 0,
+        imagesWithoutAlt: 0,
+        linksChecked: 1,
+        linksFound: 1,
+        redirects: 0,
+        resourcesChecked: 0,
+        totalIssues: 0,
+      },
+    };
+    const auditPage = vi.fn(async () => report);
+    const auditApp = createApp({ auditPage });
+
+    const response = await request(auditApp)
+      .post('/api/audits')
+      .send({ url: 'https://example.com' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(report);
+    expect(auditPage).toHaveBeenCalledWith('https://example.com');
+  });
+});

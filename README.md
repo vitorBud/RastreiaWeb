@@ -72,8 +72,24 @@ Content-Type: application/json
 
 Ele aceita apenas HTTP e HTTPS, bloqueia credenciais, portas fora do escopo,
 hostnames locais e endereços IP privados ou reservados. A validação também
-confere todos os endereços retornados pelo DNS. Redirecionamentos precisarão
-passar pelas mesmas regras quando a navegação for implementada.
+confere todos os endereços retornados pelo DNS. Esse endpoint não abre a página;
+o fluxo de auditoria aplica novamente essas regras a cada redirecionamento.
+
+### Primeira auditoria de página
+
+```http
+POST /api/audits
+Content-Type: application/json
+
+{
+  "url": "https://exemplo.com.br"
+}
+```
+
+A auditoria acessa uma única página, revalida redirecionamentos e conecta ao IP
+público aprovado para reduzir o risco de DNS rebinding. O HTML é interpretado
+com JavaScript e rede bloqueados. Nesta fase, são verificados no máximo 20 links
+e 20 recursos entre imagens, folhas de estilo e scripts.
 
 ## Qualidade
 

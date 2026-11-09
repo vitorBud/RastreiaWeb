@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "npm run build:shared && npm run build:audit",
     "dev": "concurrently -n web,api -c cyan,green \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "npm run dev --workspace @rastreiaweb/web",
     "dev:api": "npm run dev --workspace @rastreiaweb/api",
@@ -20,7 +21,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run build:shared && npm run build:audit && npm run lint && npm run typecheck && npm run test && npm run build:api && npm run build:web"
   },
   "engines": {
     "node": ">=22"

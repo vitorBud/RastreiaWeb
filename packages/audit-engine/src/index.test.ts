@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { getAuditEngineStatus } from './index.js';
 
 describe('getAuditEngineStatus', () => {
-  it('impede que a fundação seja confundida com uma auditoria pronta', () => {
+  it('informa que o motor pode analisar HTML de forma isolada', () => {
     expect(getAuditEngineStatus()).toEqual({
-      ready: false,
-      reason: 'A validação contra SSRF deve ser implementada antes da navegação.',
+      ready: true,
+      reason: 'Pronto para analisar HTML obtido por uma camada de rede controlada.',
     });
   });
 });

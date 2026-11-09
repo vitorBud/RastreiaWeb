@@ -1,3 +1,11 @@
+export {
+  createDocumentInventory,
+  type DocumentImage,
+  type DocumentInventory,
+  type DocumentLink,
+  type DocumentResource,
+} from './document-inventory.js';
+
 export interface AuditEngineStatus {
   ready: boolean;
   reason: string;
@@ -5,7 +13,7 @@ export interface AuditEngineStatus {
 
 export function getAuditEngineStatus(): AuditEngineStatus {
   return {
-    ready: false,
-    reason: 'A validação contra SSRF deve ser implementada antes da navegação.',
+    ready: true,
+    reason: 'Pronto para analisar HTML obtido por uma camada de rede controlada.',
   };
 }
