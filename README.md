@@ -101,9 +101,21 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 
 ## Limitações atuais
 
-- Nenhuma URL externa é acessada nesta fundação.
-- O formulário inicial ainda não dispara uma auditoria.
+- Apenas uma página é analisada por vez; não existe crawler de múltiplas páginas.
+- O histórico é armazenado localmente no navegador e ainda não possui sincronização.
+- A verificação de responsividade e a integração completa com axe-core ainda não foram implementadas.
+- Alguns sites podem restringir requisições automatizadas e produzir resultados inconclusivos.
 - Testes automáticos não substituem uma avaliação manual completa de acessibilidade.
+
+## Interface atual
+
+- Visão geral com resumo da última auditoria.
+- Formulário para nova auditoria.
+- Relatório com filtros de categoria e gravidade.
+- Exportação do relatório em JSON e impressão.
+- Histórico local com seleção e exclusão de resultados.
+- Configurações de limites de links, recursos e histórico.
+- Área de ajuda com explicações e limitações.
 
 ## Roadmap
 

@@ -4,9 +4,41 @@ import { App } from './App';
 
 const fetchMock = vi.fn();
 
+const report = {
+  analyzedAt: '2026-11-09T12:00:00.000Z',
+  disclaimer: 'Análise automática não substitui revisão manual.',
+  durationMs: 320,
+  finalUrl: 'https://example.com/',
+  initialUrl: 'https://example.com',
+  issues: [{
+    category: 'link',
+    code: 'NOT_FOUND',
+    description: 'O destino respondeu com o status HTTP 404.',
+    pageUrl: 'https://example.com/',
+    severity: 'serious',
+    statusCode: 404,
+    targetUrl: 'https://example.com/inexistente',
+  }],
+  limits: { maxLinks: 20, maxResources: 20 },
+  pageTitle: 'Example Domain',
+  summary: {
+    brokenLinks: 1,
+    failedResources: 0,
+    imagesFound: 0,
+    imagesWithoutAlt: 0,
+    linksChecked: 1,
+    linksFound: 1,
+    redirects: 0,
+    resourcesChecked: 0,
+    totalIssues: 1,
+  },
+};
+
 beforeEach(() => {
+  window.localStorage.clear();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('scrollTo', vi.fn());
 });
 
 afterAll(() => {
@@ -14,40 +46,42 @@ afterAll(() => {
 });
 
 describe('App', () => {
-  it('envia a URL e apresenta o endereço normalizado', async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({
-      valid: true,
-      url: {
-        hostname: 'example.com',
-        normalizedUrl: 'https://example.com/',
-        protocol: 'https:',
-      },
-    }), { status: 200 }));
-
+  it('executa uma auditoria e abre o relatório real', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(report), { status: 200 }));
     render(<App />);
 
     fireEvent.change(screen.getByLabelText('URL pública autorizada'), {
       target: { value: 'https://example.com' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Validar página' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Analisar página' }));
 
-    await screen.findByText('URL validada com segurança: https://example.com/');
-    expect(screen.getByRole('status')).toHaveTextContent('https://example.com/');
+    expect(await screen.findByText('Example Domain')).toBeInTheDocument();
+    expect(screen.getByText('O destino respondeu com o status HTTP 404.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/audits', expect.objectContaining({
+      method: 'POST',
+    }));
   });
 
-  it('apresenta como alerta um destino bloqueado pela API', async () => {
+  it('navega para configurações pelo menu lateral', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Configurações' }));
+
+    expect(screen.getByRole('heading', { name: 'Configurações' })).toBeInTheDocument();
+    expect(screen.getByText('Configurações da auditoria')).toBeInTheDocument();
+  });
+
+  it('apresenta erros da auditoria no formulário', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({
       code: 'PRIVATE_ADDRESS',
       error: 'A URL aponta para um endereço privado ou reservado.',
-      valid: false,
     }), { status: 422 }));
-
     render(<App />);
 
     fireEvent.change(screen.getByLabelText('URL pública autorizada'), {
       target: { value: 'http://127.0.0.1' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Validar página' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Analisar página' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'A URL aponta para um endereço privado ou reservado.',

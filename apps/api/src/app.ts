@@ -3,7 +3,11 @@ import express from 'express';
 import { z } from 'zod';
 import type { AuditReport } from '@rastreiaweb/shared';
 import { AuditNetworkError } from './audit/public-http-client.js';
-import { auditPage, PageAuditError } from './audit/page-audit.js';
+import {
+  auditPage,
+  PageAuditError,
+  type PageAuditOptions,
+} from './audit/page-audit.js';
 import {
   resolveHostnameWithDns,
   UrlValidationError,
@@ -12,11 +16,19 @@ import {
 } from './security/public-url.js';
 
 interface AppDependencies {
-  auditPage: (url: string) => Promise<AuditReport>;
+  auditPage: (url: string, options?: PageAuditOptions) => Promise<AuditReport>;
   resolveHostname: ResolveHostname;
 }
 
 const urlRequestSchema = z.strictObject({
+  url: z.string(),
+});
+
+const auditRequestSchema = z.strictObject({
+  options: z.strictObject({
+    maxLinks: z.number().int().min(1).max(50),
+    maxResources: z.number().int().min(1).max(50),
+  }).optional(),
   url: z.string(),
 });
 
@@ -26,6 +38,7 @@ export function createApp(
   const app = express();
   const runAudit = dependencies.auditPage ?? auditPage;
   const resolveHostname = dependencies.resolveHostname ?? resolveHostnameWithDns;
+  let auditInProgress = false;
 
   app.disable('x-powered-by');
   app.use(cors({ origin: 'http://localhost:5173' }));
@@ -88,7 +101,7 @@ export function createApp(
   });
 
   app.post('/api/audits', async (request, response) => {
-    const parsedBody = urlRequestSchema.safeParse(request.body);
+    const parsedBody = auditRequestSchema.safeParse(request.body);
 
     if (!parsedBody.success) {
       response.status(400).json({
@@ -98,8 +111,18 @@ export function createApp(
       return;
     }
 
+    if (auditInProgress) {
+      response.status(429).json({
+        code: 'AUDIT_IN_PROGRESS',
+        error: 'Já existe uma auditoria em andamento. Aguarde a conclusão.',
+      });
+      return;
+    }
+
+    auditInProgress = true;
+
     try {
-      const report = await runAudit(parsedBody.data.url);
+      const report = await runAudit(parsedBody.data.url, parsedBody.data.options);
       response.status(200).json(report);
     } catch (error) {
       if (error instanceof UrlValidationError) {
@@ -130,6 +153,8 @@ export function createApp(
         code: 'INTERNAL_ERROR',
         error: 'Não foi possível concluir a auditoria.',
       });
+    } finally {
+      auditInProgress = false;
     }
   });
 

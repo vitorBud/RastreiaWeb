@@ -84,7 +84,7 @@ function createDecodedStream(
 
 export const requestPinnedAddress: RawRequest = (target, options) =>
   new Promise((resolve, reject) => {
-    const address = target.addresses[0];
+    const address = target.addresses.find((item) => item.family === 4) ?? target.addresses[0];
 
     if (!address) {
       reject(new AuditNetworkError('REQUEST_FAILED', 'Nenhum endereço público disponível.'));

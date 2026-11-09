@@ -28,7 +28,7 @@ export class PageAuditError extends Error {
   }
 }
 
-interface PageAuditOptions {
+export interface PageAuditOptions {
   maxLinks?: number;
   maxResources?: number;
 }

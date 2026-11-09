@@ -98,6 +98,44 @@ describe('POST /api/audits', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual(report);
-    expect(auditPage).toHaveBeenCalledWith('https://example.com');
+    expect(auditPage).toHaveBeenCalledWith('https://example.com', undefined);
+  });
+
+  it('encaminha limites personalizados para o motor', async () => {
+    const auditPage = vi.fn(async () => ({
+      analyzedAt: '2026-11-09T12:00:00.000Z',
+      disclaimer: 'Análise automática.',
+      durationMs: 100,
+      finalUrl: 'https://example.com/',
+      initialUrl: 'https://example.com',
+      issues: [],
+      limits: { maxLinks: 10, maxResources: 8 },
+      pageTitle: 'Example Domain',
+      summary: {
+        brokenLinks: 0,
+        failedResources: 0,
+        imagesFound: 0,
+        imagesWithoutAlt: 0,
+        linksChecked: 0,
+        linksFound: 0,
+        redirects: 0,
+        resourcesChecked: 0,
+        totalIssues: 0,
+      },
+    }));
+    const auditApp = createApp({ auditPage });
+
+    const response = await request(auditApp)
+      .post('/api/audits')
+      .send({
+        options: { maxLinks: 10, maxResources: 8 },
+        url: 'https://example.com',
+      });
+
+    expect(response.status).toBe(200);
+    expect(auditPage).toHaveBeenCalledWith('https://example.com', {
+      maxLinks: 10,
+      maxResources: 8,
+    });
   });
 });
