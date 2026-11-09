@@ -1,0 +1,38 @@
+{
+  "name": "rastreiaweb",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plataforma open source de auditoria e diagnóstico de websites.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,green \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm run dev --workspace @rastreiaweb/web",
+    "dev:api": "npm run dev --workspace @rastreiaweb/api",
+    "build": "npm run build:shared && npm run build:audit && npm run build:api && npm run build:web",
+    "build:shared": "npm run build --workspace @rastreiaweb/shared",
+    "build:audit": "npm run build --workspace @rastreiaweb/audit-engine",
+    "build:api": "npm run build --workspace @rastreiaweb/api",
+    "build:web": "npm run build --workspace @rastreiaweb/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "minimatch": "11.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.7",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.2"
+  }
+}
