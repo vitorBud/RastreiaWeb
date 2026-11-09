@@ -1,4 +1,7 @@
 import { FormEvent, useState, type ReactNode } from 'react';
+import { ApiRequestError, validateUrl } from './services/validate-url';
+
+type ValidationStatus = 'error' | 'idle' | 'loading' | 'success';
 
 type IconName =
   | 'bell'
@@ -50,11 +53,27 @@ const categories = [
 ];
 
 export function App() {
+  const [url, setUrl] = useState('');
   const [message, setMessage] = useState('');
+  const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage('A conexão segura com a auditoria será implementada na próxima etapa.');
+    setValidationStatus('loading');
+    setMessage('Validando protocolo, domínio e endereços de rede…');
+
+    try {
+      const result = await validateUrl(url);
+      setValidationStatus('success');
+      setMessage(`URL validada com segurança: ${result.url.normalizedUrl}`);
+    } catch (error) {
+      setValidationStatus('error');
+      setMessage(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Não foi possível validar a URL.',
+      );
+    }
   }
 
   return (
@@ -113,11 +132,31 @@ export function App() {
             id="website-url"
             name="website-url"
             type="url"
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value);
+              setMessage('');
+              setValidationStatus('idle');
+            }}
             placeholder="Cole uma URL pública autorizada"
+            aria-describedby={message ? 'url-validation-message' : undefined}
+            aria-invalid={validationStatus === 'error'}
+            disabled={validationStatus === 'loading'}
             required
           />
-          <button type="submit"><Icon name="scan" />Analisar página</button>
-          {message && <p className="status-message" role="status">{message}</p>}
+          <button type="submit" disabled={validationStatus === 'loading'}>
+            <Icon name="scan" />
+            {validationStatus === 'loading' ? 'Validando…' : 'Validar página'}
+          </button>
+          {message && (
+            <p
+              className={`status-message ${validationStatus}`}
+              id="url-validation-message"
+              role={validationStatus === 'error' ? 'alert' : 'status'}
+            >
+              {message}
+            </p>
+          )}
         </form>
 
         <section className="overview-grid" id="overview" aria-label="Visão geral do projeto">
@@ -137,9 +176,9 @@ export function App() {
           <article className="card security-card">
             <div className="security-glow" />
             <Icon name="shield" />
-            <span className="card-eyebrow">Próxima decisão</span>
-            <h2>Segurança antes da navegação</h2>
-            <p>A proteção contra SSRF será implementada antes de acessar qualquer URL.</p>
+            <span className="card-eyebrow">Camada de segurança</span>
+            <h2>Validação inicial ativa</h2>
+            <p>Protocolos, hostnames, DNS e endereços privados já são verificados pela API.</p>
             <a href="#next-steps">Ver próximos passos <span aria-hidden="true">→</span></a>
           </article>
 
@@ -196,11 +235,11 @@ export function App() {
           </article>
 
           <article className="card next-card" id="next-steps">
-            <span className="step-number">01</span>
+            <span className="step-number">02</span>
             <div>
               <span className="card-eyebrow">Próximo passo</span>
-              <h2>Validar URLs com segurança</h2>
-              <p>Vamos definir protocolos permitidos, bloquear redes privadas e testar redirecionamentos antes de conectar o Playwright.</p>
+              <h2>Criar uma navegação controlada</h2>
+              <p>O próximo passo será revalidar redirecionamentos e impedir DNS rebinding antes de conectar o Playwright.</p>
             </div>
             <span className="next-arrow" aria-hidden="true">↗</span>
           </article>
