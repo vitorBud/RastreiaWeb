@@ -1,4 +1,4 @@
-import type { AuditReport, AuditSettings } from '../types/audit';
+import type { AuditProgress, AuditReport, AuditSettings } from '../types/audit';
 
 export class AuditApiError extends Error {
   constructor(
@@ -106,16 +106,118 @@ function isAuditReport(value: unknown): value is AuditReport {
   );
 }
 
+function isAuditProgress(value: unknown): value is AuditProgress {
+  return (
+    isRecord(value) &&
+    typeof value.completed === 'number' &&
+    typeof value.message === 'string' &&
+    typeof value.percent === 'number' &&
+    value.percent >= 0 &&
+    value.percent <= 100 &&
+    ['downloading', 'inventory', 'checking', 'reporting', 'complete']
+      .includes(typeof value.phase === 'string' ? value.phase : '') &&
+    typeof value.total === 'number'
+  );
+}
+
+async function readAuditStream(
+  response: Response,
+  onProgress?: (progress: AuditProgress) => void,
+): Promise<AuditReport> {
+  if (!response.body) {
+    throw new AuditApiError(
+      'A API não disponibilizou o fluxo de progresso.',
+      'INVALID_RESPONSE',
+      response.status,
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let report: AuditReport | null = null;
+
+  const processLine = (line: string) => {
+    if (!line.trim()) {
+      return;
+    }
+
+    let event: unknown;
+
+    try {
+      event = JSON.parse(line);
+    } catch {
+      throw new AuditApiError(
+        'A API enviou um evento de progresso inválido.',
+        'INVALID_RESPONSE',
+        response.status,
+      );
+    }
+
+    if (!isRecord(event) || typeof event.type !== 'string') {
+      return;
+    }
+
+    if (event.type === 'progress' && isAuditProgress(event.progress)) {
+      onProgress?.(event.progress);
+      return;
+    }
+
+    if (event.type === 'report' && isAuditReport(event.report)) {
+      report = event.report;
+      return;
+    }
+
+    if (event.type === 'error' && isRecord(event.error)) {
+      throw new AuditApiError(
+        typeof event.error.error === 'string'
+          ? event.error.error
+          : 'A auditoria não pôde ser concluída.',
+        typeof event.error.code === 'string' ? event.error.code : 'AUDIT_ERROR',
+        typeof event.error.status === 'number' ? event.error.status : response.status,
+      );
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    lines.forEach(processLine);
+
+    if (done) {
+      break;
+    }
+  }
+
+  processLine(buffer);
+
+  if (!report) {
+    throw new AuditApiError(
+      'A API encerrou o progresso sem enviar o relatório.',
+      'INVALID_RESPONSE',
+      response.status,
+    );
+  }
+
+  return report;
+}
+
 export async function runPageAudit(
   url: string,
   settings: AuditSettings,
+  onProgress?: (progress: AuditProgress) => void,
 ): Promise<AuditReport> {
   let response: Response;
 
   try {
     response = await fetch('/api/audits', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/x-ndjson',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         options: {
           maxLinks: settings.maxLinks,
@@ -130,6 +232,13 @@ export async function runPageAudit(
       'NETWORK_ERROR',
       0,
     );
+  }
+
+  if (
+    response.ok &&
+    response.headers.get('content-type')?.includes('application/x-ndjson')
+  ) {
+    return readAuditStream(response, onProgress);
   }
 
   let body: unknown;

@@ -7,6 +7,7 @@ import type {
   AuditIssue,
   AuditLinkResult,
   AuditLinkState,
+  AuditProgress,
   AuditReport,
   AuditSeverity,
 } from '@rastreiaweb/shared';
@@ -34,6 +35,7 @@ export class PageAuditError extends Error {
 export interface PageAuditOptions {
   maxLinks?: number;
   maxResources?: number;
+  onProgress?: (progress: AuditProgress) => void;
 }
 
 interface PageAuditDependencies {
@@ -247,12 +249,17 @@ async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
   worker: (item: T) => Promise<R>,
+  onItemComplete?: () => void,
 ): Promise<R[]> {
   const results: R[] = [];
 
   for (let index = 0; index < items.length; index += concurrency) {
     const batch = items.slice(index, index + concurrency);
-    results.push(...await Promise.all(batch.map(worker)));
+    results.push(...await Promise.all(batch.map(async (item) => {
+      const result = await worker(item);
+      onItemComplete?.();
+      return result;
+    })));
   }
 
   return results;
@@ -266,8 +273,16 @@ export async function auditPage(
   const startedAt = Date.now();
   const maxLinks = options.maxLinks ?? 20;
   const maxResources = options.maxResources ?? 20;
+  const onProgress = options.onProgress;
   const requestUrl = dependencies.requestUrl ?? requestPublicUrl;
   const createInventory = dependencies.createInventory ?? createDocumentInventory;
+  onProgress?.({
+    completed: 0,
+    message: 'Baixando a página principal…',
+    percent: 3,
+    phase: 'downloading',
+    total: 1,
+  });
   const pageResponse = await requestUrl(inputUrl, {
     maxBodyBytes: 2_000_000,
     maxRedirects: 5,
@@ -299,6 +314,14 @@ export async function auditPage(
     );
   }
 
+  onProgress?.({
+    completed: 1,
+    message: 'Página recebida. Lendo o HTML…',
+    percent: 16,
+    phase: 'inventory',
+    total: 1,
+  });
+
   const inventory: DocumentInventory = await createInventory(
     pageResponse.body,
     pageResponse.finalUrl,
@@ -314,6 +337,32 @@ export async function auditPage(
       .map((image) => ({ ...image, kind: 'image' as const })),
     ...inventory.resources,
   ].slice(0, maxResources);
+  const totalChecks = linksToCheck.length + resources.length;
+  let completedChecks = 0;
+  const reportCheckProgress = () => {
+    completedChecks += 1;
+    const percent = totalChecks === 0
+      ? 88
+      : 28 + Math.round((completedChecks / totalChecks) * 60);
+
+    onProgress?.({
+      completed: completedChecks,
+      message: `Verificando destinos e recursos (${completedChecks} de ${totalChecks})…`,
+      percent,
+      phase: 'checking',
+      total: totalChecks,
+    });
+  };
+
+  onProgress?.({
+    completed: 0,
+    message: totalChecks === 0
+      ? 'Nenhum destino HTTP precisa ser verificado.'
+      : `Inventário concluído. ${totalChecks} item(ns) serão verificados.`,
+    percent: totalChecks === 0 ? 88 : 28,
+    phase: 'checking',
+    total: totalChecks,
+  });
   const issues: AuditIssue[] = [
     ...inventory.images
       .filter((image) => image.alt === null)
@@ -349,6 +398,7 @@ export async function auditPage(
       'link',
       requestUrl,
     ),
+    reportCheckProgress,
   );
   const resourceResults = await mapWithConcurrency(resources, 4, (resource) =>
     checkTarget(
@@ -358,6 +408,7 @@ export async function auditPage(
       'resource',
       requestUrl,
     ),
+    reportCheckProgress,
   );
 
   issues.push(
@@ -402,7 +453,15 @@ export async function auditPage(
     } satisfies AuditLinkResult;
   });
 
-  return {
+  onProgress?.({
+    completed: totalChecks,
+    message: 'Organizando ocorrências e preparando o relatório…',
+    percent: 94,
+    phase: 'reporting',
+    total: totalChecks,
+  });
+
+  const report: AuditReport = {
     analyzedAt: new Date().toISOString(),
     disclaimer: 'Esta análise automática não substitui testes manuais completos de acessibilidade e experiência.',
     durationMs: Date.now() - startedAt,
@@ -430,4 +489,14 @@ export async function auditPage(
       unreachableLinks: linkResults.filter((result) => result.state === 'unreachable').length,
     },
   };
+
+  onProgress?.({
+    completed: totalChecks,
+    message: 'Auditoria concluída.',
+    percent: 100,
+    phase: 'complete',
+    total: totalChecks,
+  });
+
+  return report;
 }

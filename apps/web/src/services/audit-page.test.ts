@@ -4,6 +4,34 @@ import { runPageAudit } from './audit-page';
 
 const fetchMock = vi.fn();
 
+function createReport() {
+  return {
+    analyzedAt: '2026-11-09T12:00:00.000Z',
+    disclaimer: 'Análise automática.',
+    durationMs: 100,
+    finalUrl: 'https://example.com/',
+    initialUrl: 'https://example.com',
+    issues: [],
+    links: [],
+    limits: { maxLinks: 20, maxResources: 20 },
+    pageTitle: 'Example Domain',
+    summary: {
+      brokenLinks: 0,
+      failedResources: 0,
+      imagesFound: 0,
+      imagesWithoutAlt: 0,
+      linksChecked: 0,
+      linksFound: 0,
+      redirects: 0,
+      restrictedLinks: 0,
+      resourcesChecked: 0,
+      unavailableLinks: 0,
+      unreachableLinks: 0,
+      totalIssues: 0,
+    },
+  };
+}
+
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
@@ -15,31 +43,7 @@ afterAll(() => {
 
 describe('runPageAudit', () => {
   it('envia a URL e os limites configurados', async () => {
-    const report = {
-      analyzedAt: '2026-11-09T12:00:00.000Z',
-      disclaimer: 'Análise automática.',
-      durationMs: 100,
-      finalUrl: 'https://example.com/',
-      initialUrl: 'https://example.com',
-      issues: [],
-      links: [],
-      limits: { maxLinks: 20, maxResources: 20 },
-      pageTitle: 'Example Domain',
-      summary: {
-        brokenLinks: 0,
-        failedResources: 0,
-        imagesFound: 0,
-        imagesWithoutAlt: 0,
-        linksChecked: 0,
-        linksFound: 0,
-        redirects: 0,
-        restrictedLinks: 0,
-        resourcesChecked: 0,
-        unavailableLinks: 0,
-        unreachableLinks: 0,
-        totalIssues: 0,
-      },
-    };
+    const report = createReport();
     fetchMock.mockResolvedValue(new Response(JSON.stringify(report), { status: 200 }));
 
     await expect(runPageAudit('https://example.com', defaultSettings)).resolves
@@ -50,6 +54,33 @@ describe('runPageAudit', () => {
         url: 'https://example.com',
       }),
     }));
+  });
+
+  it('acompanha eventos reais de progresso até receber o relatório', async () => {
+    const report = createReport();
+    const progress = {
+      completed: 2,
+      message: 'Verificando destinos e recursos (2 de 4)…',
+      percent: 58,
+      phase: 'checking',
+      total: 4,
+    };
+    const stream = [
+      JSON.stringify({ progress, type: 'progress' }),
+      JSON.stringify({ report, type: 'report' }),
+    ].join('\n');
+    const onProgress = vi.fn();
+    fetchMock.mockResolvedValue(new Response(stream, {
+      headers: { 'Content-Type': 'application/x-ndjson' },
+      status: 200,
+    }));
+
+    await expect(runPageAudit(
+      'https://example.com',
+      defaultSettings,
+      onProgress,
+    )).resolves.toMatchObject({ pageTitle: 'Example Domain' });
+    expect(onProgress).toHaveBeenCalledWith(progress);
   });
 
   it('apresenta a mensagem de erro enviada pela API', async () => {

@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { z } from 'zod';
-import type { AuditReport } from '@rastreiaweb/shared';
+import type { AuditProgress, AuditReport } from '@rastreiaweb/shared';
 import { AuditNetworkError } from './audit/public-http-client.js';
 import {
   auditPage,
@@ -31,6 +31,31 @@ const auditRequestSchema = z.strictObject({
   }).optional(),
   url: z.string(),
 });
+
+function auditErrorResponse(error: unknown) {
+  if (error instanceof UrlValidationError) {
+    return { body: { code: error.code, error: error.message }, status: 422 };
+  }
+
+  if (error instanceof PageAuditError) {
+    return { body: { code: error.code, error: error.message }, status: 422 };
+  }
+
+  if (error instanceof AuditNetworkError) {
+    return {
+      body: { code: error.code, error: error.message },
+      status: error.code === 'TIMEOUT' ? 504 : 502,
+    };
+  }
+
+  return {
+    body: {
+      code: 'INTERNAL_ERROR',
+      error: 'Não foi possível concluir a auditoria.',
+    },
+    status: 500,
+  };
+}
 
 export function createApp(
   dependencies: Partial<AppDependencies> = {},
@@ -121,38 +146,45 @@ export function createApp(
 
     auditInProgress = true;
 
+    if (request.headers.accept?.includes('application/x-ndjson')) {
+      response.status(200);
+      response.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      response.setHeader('Cache-Control', 'no-cache, no-transform');
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      response.flushHeaders();
+
+      const writeEvent = (event: object) => {
+        response.write(`${JSON.stringify(event)}\n`);
+      };
+
+      try {
+        const report = await runAudit(parsedBody.data.url, {
+          ...(parsedBody.data.options ?? {}),
+          onProgress: (progress: AuditProgress) => {
+            writeEvent({ progress, type: 'progress' });
+          },
+        });
+        writeEvent({ report, type: 'report' });
+      } catch (error) {
+        const result = auditErrorResponse(error);
+        writeEvent({
+          error: { ...result.body, status: result.status },
+          type: 'error',
+        });
+      } finally {
+        auditInProgress = false;
+        response.end();
+      }
+
+      return;
+    }
+
     try {
       const report = await runAudit(parsedBody.data.url, parsedBody.data.options);
       response.status(200).json(report);
     } catch (error) {
-      if (error instanceof UrlValidationError) {
-        response.status(422).json({
-          code: error.code,
-          error: error.message,
-        });
-        return;
-      }
-
-      if (error instanceof PageAuditError) {
-        response.status(422).json({
-          code: error.code,
-          error: error.message,
-        });
-        return;
-      }
-
-      if (error instanceof AuditNetworkError) {
-        response.status(error.code === 'TIMEOUT' ? 504 : 502).json({
-          code: error.code,
-          error: error.message,
-        });
-        return;
-      }
-
-      response.status(500).json({
-        code: 'INTERNAL_ERROR',
-        error: 'Não foi possível concluir a auditoria.',
-      });
+      const result = auditErrorResponse(error);
+      response.status(result.status).json(result.body);
     } finally {
       auditInProgress = false;
     }

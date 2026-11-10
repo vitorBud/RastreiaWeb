@@ -1,6 +1,8 @@
 import { AuditForm } from '../components/AuditForm';
+import type { AuditProgress } from '../types/audit';
 
 interface NewAuditViewProps {
+  auditProgress: AuditProgress | null;
   error: string;
   isAuditing: boolean;
   onAudit: (url: string) => Promise<void>;
@@ -19,6 +21,7 @@ export function NewAuditView(props: NewAuditViewProps) {
       <AuditForm
         error={props.error}
         isLoading={props.isAuditing}
+        progress={props.auditProgress}
         onResetError={props.onResetError}
         onSubmit={props.onAudit}
         variant="full"

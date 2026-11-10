@@ -1,10 +1,37 @@
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
+import type { PageAuditOptions } from './audit/page-audit.js';
 
 const publicResolver = vi.fn(async () => [
   { address: '93.184.216.34', family: 4 },
 ]);
+
+const streamedReport = {
+  analyzedAt: '2026-11-09T12:00:00.000Z',
+  disclaimer: 'Análise automática.',
+  durationMs: 120,
+  finalUrl: 'https://example.com/',
+  initialUrl: 'https://example.com',
+  issues: [],
+  links: [],
+  limits: { maxLinks: 20, maxResources: 20 },
+  pageTitle: 'Example Domain',
+  summary: {
+    brokenLinks: 0,
+    failedResources: 0,
+    imagesFound: 0,
+    imagesWithoutAlt: 0,
+    linksChecked: 0,
+    linksFound: 0,
+    redirects: 0,
+    restrictedLinks: 0,
+    resourcesChecked: 0,
+    totalIssues: 0,
+    unavailableLinks: 0,
+    unreachableLinks: 0,
+  },
+};
 
 const app = createApp({ resolveHostname: publicResolver });
 
@@ -67,6 +94,39 @@ describe('POST /api/urls/validate', () => {
 });
 
 describe('POST /api/audits', () => {
+  it('transmite progresso real e o relatório final em NDJSON', async () => {
+    const auditPage = vi.fn(async (_url: string, options?: PageAuditOptions) => {
+      options?.onProgress?.({
+        completed: 1,
+        message: 'Verificando destinos e recursos (1 de 2)…',
+        percent: 58,
+        phase: 'checking',
+        total: 2,
+      });
+      return streamedReport;
+    });
+    const auditApp = createApp({ auditPage });
+
+    const response = await request(auditApp)
+      .post('/api/audits')
+      .set('Accept', 'application/x-ndjson')
+      .send({ url: 'https://example.com' });
+    const events = response.text.trim().split('\n').map((line) => JSON.parse(line));
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/x-ndjson');
+    expect(events).toEqual([
+      expect.objectContaining({
+        progress: expect.objectContaining({ percent: 58 }),
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        report: expect.objectContaining({ pageTitle: 'Example Domain' }),
+        type: 'report',
+      }),
+    ]);
+  });
+
   it('devolve o relatório produzido pelo motor de auditoria', async () => {
     const report = {
       analyzedAt: '2026-11-09T12:00:00.000Z',

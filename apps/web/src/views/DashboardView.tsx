@@ -1,6 +1,7 @@
 import type {
   AppView,
   AuditCategory,
+  AuditProgress,
   AuditReport,
   ReportFocus,
 } from '../types/audit';
@@ -11,6 +12,7 @@ import { MissingAltOverview } from '../components/MissingAltOverview';
 
 interface DashboardViewProps {
   auditError: string;
+  auditProgress: AuditProgress | null;
   history: AuditReport[];
   isAuditing: boolean;
   onAudit: (url: string) => Promise<void>;
@@ -59,6 +61,7 @@ export function DashboardView(props: DashboardViewProps) {
       <AuditForm
         error={props.auditError}
         isLoading={props.isAuditing}
+        progress={props.auditProgress}
         onResetError={props.onResetError}
         onSubmit={props.onAudit}
       />

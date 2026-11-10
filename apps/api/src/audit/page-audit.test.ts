@@ -49,8 +49,9 @@ describe('auditPage', () => {
       resources: [],
       title: 'Exemplo',
     }));
+    const onProgress = vi.fn();
 
-    const report = await auditPage('https://example.com', {}, {
+    const report = await auditPage('https://example.com', { onProgress }, {
       createInventory,
       requestUrl,
     });
@@ -86,6 +87,15 @@ describe('auditPage', () => {
         targetUrl: 'https://example.com/inexistente',
         text: 'Link',
       }),
+    ]);
+    expect(onProgress.mock.calls.map(([progress]) => progress.percent)).toEqual([
+      3,
+      16,
+      28,
+      58,
+      88,
+      94,
+      100,
     ]);
   });
 

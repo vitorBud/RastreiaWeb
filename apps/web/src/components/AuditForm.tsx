@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import type { AuditProgress } from '../types/audit';
 import { Icon } from './Icon';
 
 interface AuditFormProps {
@@ -6,6 +7,7 @@ interface AuditFormProps {
   isLoading: boolean;
   onResetError: () => void;
   onSubmit: (url: string) => Promise<void>;
+  progress: AuditProgress | null;
   variant?: 'compact' | 'full';
 }
 
@@ -14,6 +16,7 @@ export function AuditForm({
   isLoading,
   onResetError,
   onSubmit,
+  progress,
   variant = 'compact',
 }: AuditFormProps) {
   const [url, setUrl] = useState('');
@@ -48,6 +51,24 @@ export function AuditForm({
         <Icon name="scan" />
         {isLoading ? 'Analisando…' : 'Analisar página'}
       </button>
+      {isLoading && progress && (
+        <div
+          className="audit-live-progress"
+          role="progressbar"
+          aria-label="Progresso da auditoria"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress.percent}
+        >
+          <div className="audit-live-progress-heading" aria-live="polite">
+            <span>{progress.message}</span>
+            <strong>{progress.percent}%</strong>
+          </div>
+          <div className="audit-live-progress-track" aria-hidden="true">
+            <span style={{ width: `${progress.percent}%` }} />
+          </div>
+        </div>
+      )}
       {error && (
         <p className="status-message error" id={`audit-error-${variant}`} role="alert">
           {error}

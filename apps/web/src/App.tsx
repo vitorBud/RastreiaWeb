@@ -10,6 +10,7 @@ import {
 } from './storage/audit-storage';
 import type {
   AppView,
+  AuditProgress,
   AuditReport,
   AuditSettings,
   ReportFocus,
@@ -74,6 +75,7 @@ export function App() {
   );
   const [settings, setSettings] = useState<AuditSettings>(loadAuditSettings);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [auditProgress, setAuditProgress] = useState<AuditProgress | null>(null);
   const [auditError, setAuditError] = useState('');
   const [reportFocus, setReportFocus] = useState<ReportFocus>({});
   const [reportNavigationId, setReportNavigationId] = useState(0);
@@ -101,9 +103,16 @@ export function App() {
   async function handleAudit(url: string) {
     setAuditError('');
     setIsAuditing(true);
+    setAuditProgress({
+      completed: 0,
+      message: 'Preparando a auditoria…',
+      percent: 0,
+      phase: 'downloading',
+      total: 1,
+    });
 
     try {
-      const report = await runPageAudit(url, settings);
+      const report = await runPageAudit(url, settings, setAuditProgress);
       const nextHistory = [
         report,
         ...history.filter((item) => item.analyzedAt !== report.analyzedAt),
@@ -126,6 +135,7 @@ export function App() {
       );
     } finally {
       setIsAuditing(false);
+      setAuditProgress(null);
     }
   }
 
@@ -205,6 +215,7 @@ export function App() {
           {view === 'dashboard' && (
             <DashboardView
               auditError={auditError}
+              auditProgress={auditProgress}
               history={history}
               isAuditing={isAuditing}
               onAudit={handleAudit}
@@ -218,6 +229,7 @@ export function App() {
           {view === 'new-audit' && (
             <NewAuditView
               error={auditError}
+              auditProgress={auditProgress}
               isAuditing={isAuditing}
               onAudit={handleAudit}
               onResetError={() => setAuditError('')}

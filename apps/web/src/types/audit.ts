@@ -69,6 +69,21 @@ export interface AuditReport {
   summary: AuditSummary;
 }
 
+export type AuditProgressPhase =
+  | 'downloading'
+  | 'inventory'
+  | 'checking'
+  | 'reporting'
+  | 'complete';
+
+export interface AuditProgress {
+  completed: number;
+  message: string;
+  percent: number;
+  phase: AuditProgressPhase;
+  total: number;
+}
+
 export interface AuditSettings {
   autoOpenReport: boolean;
   historyLimit: number;

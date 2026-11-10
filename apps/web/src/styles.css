@@ -263,6 +263,7 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.7rem;
   min-height: 3.6rem;
   margin-bottom: 1rem;
@@ -308,6 +309,51 @@ a { color: inherit; text-decoration: none; }
 .audit-bar input:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.audit-live-progress {
+  display: grid;
+  flex: 0 0 100%;
+  gap: 0.45rem;
+  padding: 0.7rem 0.35rem 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.audit-live-progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.audit-live-progress-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-live-progress-heading strong {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.audit-live-progress-track {
+  height: 0.42rem;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(17, 24, 32, 0.72);
+}
+
+.audit-live-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lavender), var(--accent), var(--success));
+  box-shadow: 0 0 0.9rem rgba(185, 167, 255, 0.45);
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .status-message {
@@ -977,6 +1023,7 @@ button.next-arrow {
   }
 
   .audit-bar button { grid-column: 1 / -1; justify-content: center; }
+  .audit-live-progress { grid-column: 1 / -1; }
   .status-message { position: static; grid-column: 1 / -1; }
 
   .status-card, .security-card, .categories-card, .scope-card, .chart-card { grid-column: 1 / -1; }
