@@ -26,7 +26,7 @@ export function HelpView() {
         <article className="page-panel">
           <span>04</span>
           <h3>Confirme manualmente</h3>
-          <p>Use o elemento HTML e a sugestão como ponto de partida para investigar cada problema.</p>
+          <p>Em imagens sem alt, confira a URL, a página de origem e o HTML. Use alt vazio somente quando a imagem for decorativa.</p>
         </article>
       </div>
 
@@ -38,6 +38,7 @@ export function HelpView() {
           <li>Responsividade e regras completas do axe-core entrarão nas próximas versões.</li>
           <li>Sites que bloqueiam requisições automatizadas podem retornar resultados inconclusivos.</li>
           <li>Respostas 401, 403 e 429 são inconclusivas e devem ser confirmadas manualmente.</li>
+          <li>Imagens em CSS, inseridas por JavaScript ou sem atributo src ainda ficam fora da verificação inicial.</li>
         </ul>
       </div>
     </section>

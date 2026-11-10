@@ -61,9 +61,74 @@ describe('auditPage', () => {
       totalIssues: 2,
     });
     expect(report.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'IMAGE_ALT_MISSING' }),
+      expect.objectContaining({
+        category: 'accessibility',
+        code: 'IMAGE_ALT_MISSING',
+        description: 'A imagem "logo.png" foi encontrada sem o atributo alt.',
+        element: '<img src="/logo.png">',
+        pageUrl: 'https://example.com/',
+        severity: 'serious',
+        suggestion: expect.stringContaining('alt=""'),
+        targetUrl: 'https://example.com/logo.png',
+      }),
       expect.objectContaining({ code: 'NOT_FOUND', statusCode: 404 }),
     ]));
+  });
+
+  it('audita cada uso da imagem sem repetir sua verificação HTTP', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { readBody?: boolean },
+    ): Promise<PublicHttpResponse> => options?.readBody
+      ? pageResponse
+      : {
+          ...pageResponse,
+          body: undefined,
+          finalUrl: url,
+        });
+    const createInventory = vi.fn(async () => ({
+      images: [
+        {
+          alt: 'Marca da empresa',
+          element: '<img src="/marca.png" alt="Marca da empresa">',
+          targetUrl: 'https://example.com/marca.png',
+        },
+        {
+          alt: null,
+          element: '<img class="rodape" src="/marca.png">',
+          targetUrl: 'https://example.com/marca.png',
+        },
+        {
+          alt: '',
+          element: '<img src="/divisor.svg" alt="">',
+          targetUrl: 'https://example.com/divisor.svg',
+        },
+      ],
+      links: [],
+      resources: [],
+      title: 'Exemplo',
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.summary).toMatchObject({
+      imagesFound: 3,
+      imagesWithoutAlt: 1,
+      resourcesChecked: 2,
+      totalIssues: 1,
+    });
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        code: 'IMAGE_ALT_MISSING',
+        element: '<img class="rodape" src="/marca.png">',
+        pageUrl: 'https://example.com/',
+        targetUrl: 'https://example.com/marca.png',
+      }),
+    ]);
+    expect(requestUrl).toHaveBeenCalledTimes(3);
   });
 
   it('recusa uma resposta que não seja HTML', async () => {

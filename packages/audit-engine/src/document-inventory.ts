@@ -138,7 +138,9 @@ export async function createDocumentInventory(
 
     return {
       ...inventory,
-      images: uniqueByTarget(inventory.images),
+      // O texto alternativo pertence a cada elemento, não ao arquivo da imagem.
+      // Preservamos ocorrências repetidas para não esconder um <img> sem alt.
+      images: inventory.images,
       links: uniqueByTarget(inventory.links),
       resources: uniqueByTarget(inventory.resources),
     };

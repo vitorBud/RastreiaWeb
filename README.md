@@ -97,6 +97,11 @@ que não oferecem suporte adequado a `HEAD`. Respostas `401`, `403` e `429` são
 tratadas como inconclusivas, enquanto `404` e `410` confirmados por `GET` são
 classificados como links quebrados.
 
+Cada elemento `<img src>` sem o atributo `alt` gera uma ocorrência própria. O
+relatório informa a URL exata da imagem, o domínio que a hospeda, a página onde
+ela aparece e o trecho HTML encontrado. Um `alt=""` presente não é tratado como
+erro automático, pois é a implementação correta para imagens apenas decorativas.
+
 ## Qualidade
 
 ```bash
@@ -111,6 +116,7 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 - O histórico é armazenado localmente no navegador e ainda não possui sincronização.
 - A verificação de responsividade e a integração completa com axe-core ainda não foram implementadas.
 - Alguns sites podem restringir requisições automatizadas e produzir resultados inconclusivos.
+- Imagens de fundo CSS, imagens inseridas por JavaScript e fontes lazy-load sem `src` ainda não entram nessa verificação inicial.
 - Testes automáticos não substituem uma avaliação manual completa de acessibilidade.
 
 ## Interface atual
@@ -119,6 +125,7 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 - Gráfico das últimas oito auditorias, dividido por categoria e com acesso ao relatório.
 - Formulário para nova auditoria.
 - Relatório com filtros de categoria e gravidade.
+- Detalhamento de imagens sem `alt`, incluindo arquivo, domínio, página e elemento HTML.
 - Distinção entre problemas confirmados, destinos indisponíveis e verificações inconclusivas.
 - Exportação do relatório em JSON e impressão.
 - Histórico local com seleção e exclusão de resultados.

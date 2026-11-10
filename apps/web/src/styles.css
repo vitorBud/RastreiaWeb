@@ -1345,6 +1345,149 @@ button.next-arrow {
   line-height: 1.5;
 }
 
+.image-alt-details {
+  margin-top: 0.85rem;
+  overflow: hidden;
+  border: 1px solid rgba(240, 184, 220, 0.14);
+  border-radius: 0.75rem;
+  background: rgba(8, 7, 9, 0.72);
+}
+
+.image-alt-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.image-alt-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.image-alt-heading small {
+  color: var(--quiet);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.image-alt-heading strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.image-alt-heading > span {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.5rem;
+  border-radius: 99px;
+  color: #ffc3a1;
+  background: rgba(255, 135, 72, 0.13);
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.image-alt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+}
+
+.image-alt-field {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.image-alt-field.wide {
+  grid-column: 1 / -1;
+  border-right: 0;
+}
+
+.image-alt-field:nth-last-child(-n+2) { border-bottom: 0; }
+.image-alt-field:nth-child(3),
+.image-alt-field:nth-child(6) { border-right: 0; }
+
+.image-alt-field dt,
+.image-alt-element > span {
+  color: var(--quiet);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.image-alt-field dd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.image-alt-field dd strong { color: #eee7ef; }
+
+.origin-label {
+  padding: 0.2rem 0.4rem;
+  border-radius: 99px;
+  color: #a7ebcc;
+  background: rgba(87, 201, 148, 0.1);
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+.origin-label.external {
+  color: #e4cbff;
+  background: rgba(168, 140, 255, 0.12);
+}
+
+.image-alt-field dd.image-alt-address {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.issue-list .image-alt-address a,
+.issue-list .image-alt-page a {
+  overflow: visible;
+  flex: 1;
+  color: var(--accent);
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.image-alt-address button {
+  flex: 0 0 auto;
+  padding: 0.38rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.42rem;
+  color: #e7e0e8;
+  background: #171418;
+  font-size: 0.58rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.image-alt-element {
+  padding: 0.85rem 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.image-alt-element pre {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .no-issues,
 .empty-page {
   display: grid;
@@ -1505,6 +1648,17 @@ button.next-arrow {
   .issue-target { align-items: stretch; flex-direction: column; }
   .issue-target button { width: 100%; }
   .issue-evidence dl > div { grid-template-columns: 1fr; gap: 0.2rem; }
+  .image-alt-heading { align-items: flex-start; flex-direction: column; }
+  .image-alt-grid { grid-template-columns: 1fr; }
+  .image-alt-field,
+  .image-alt-field.wide {
+    grid-column: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .image-alt-field:last-child { border-bottom: 0; }
+  .image-alt-field dd.image-alt-address { align-items: stretch; flex-direction: column; }
+  .image-alt-address button { width: 100%; }
   .history-list article { grid-template-columns: 1fr; }
   .delete-row { width: 100%; height: 2.5rem; }
   .settings-actions { align-items: flex-start; flex-direction: column; }
@@ -1517,5 +1671,6 @@ button.next-arrow {
   .dashboard { padding: 0; color: #111; background: #fff; }
   .report-workspace { display: block; }
   .page-panel, .summary-cards article, .issue-list > li { color: #111; border-color: #ccc; background: #fff; box-shadow: none; }
+  .image-alt-details { border-color: #ccc; background: #fff; }
   .issue-list pre { color: #111; background: #f3f3f3; }
 }

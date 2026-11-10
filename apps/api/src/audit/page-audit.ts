@@ -51,6 +51,31 @@ interface TargetCheckResult {
   state: TargetState;
 }
 
+function readableFileName(targetUrl: string): string {
+  try {
+    const url = new URL(targetUrl);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const fileName = segments[segments.length - 1];
+
+    return decodeURIComponent(fileName || url.hostname).slice(0, 120);
+  } catch {
+    return targetUrl.slice(0, 120);
+  }
+}
+
+function uniqueByTarget<T extends { targetUrl: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.targetUrl)) {
+      return false;
+    }
+
+    seen.add(item.targetUrl);
+    return true;
+  });
+}
+
 async function requestStatus(
   targetUrl: string,
   requestUrl: typeof requestPublicUrl,
@@ -254,7 +279,8 @@ export async function auditPage(
   );
   const links = inventory.links.slice(0, maxLinks);
   const resources = [
-    ...inventory.images.map((image) => ({ ...image, kind: 'image' as const })),
+    ...uniqueByTarget(inventory.images)
+      .map((image) => ({ ...image, kind: 'image' as const })),
     ...inventory.resources,
   ].slice(0, maxResources);
   const issues: AuditIssue[] = inventory.images
@@ -262,11 +288,11 @@ export async function auditPage(
     .map((image) => ({
       category: 'accessibility',
       code: 'IMAGE_ALT_MISSING',
-      description: 'A imagem não possui o atributo alt.',
+      description: `A imagem "${readableFileName(image.targetUrl)}" foi encontrada sem o atributo alt.`,
       element: image.element,
       pageUrl: pageResponse.finalUrl,
       severity: 'serious',
-      suggestion: 'Adicione uma alternativa textual ou alt vazio quando a imagem for apenas decorativa.',
+      suggestion: 'Se a imagem comunica conteúdo ou funciona como controle, adicione um alt que descreva objetivamente sua informação ou função. Se for apenas decorativa, mantenha o atributo presente e vazio (alt=""). Não use somente o nome do arquivo como texto alternativo.',
       targetUrl: image.targetUrl,
     }));
 

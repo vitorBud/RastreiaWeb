@@ -49,6 +49,32 @@ const severityOrder: Record<AuditSeverity, number> = {
   minor: 3,
 };
 
+function hostname(url: string | undefined): string {
+  if (!url) {
+    return 'Não informado';
+  }
+
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function fileName(url: string | undefined): string {
+  if (!url) {
+    return 'Imagem sem URL identificável';
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    const segments = parsedUrl.pathname.split('/').filter(Boolean);
+    return decodeURIComponent(segments[segments.length - 1] || parsedUrl.hostname);
+  } catch {
+    return url;
+  }
+}
+
 function issueOutcome(issue: AuditIssue): IssueOutcome {
   switch (issue.code) {
     case 'NOT_FOUND':
@@ -67,21 +93,114 @@ function issueOutcome(issue: AuditIssue): IssueOutcome {
   }
 }
 
+interface ImageAltDetailsProps {
+  copiedUrl: string;
+  issue: AuditIssue;
+  onCopyUrl: (url: string) => void;
+}
+
+function ImageAltDetails({ copiedUrl, issue, onCopyUrl }: ImageAltDetailsProps) {
+  const imageHost = hostname(issue.targetUrl);
+  const pageHost = hostname(issue.pageUrl);
+  const imageName = fileName(issue.targetUrl);
+  const externalResource = imageHost !== 'Não informado' && imageHost !== pageHost;
+
+  return (
+    <section
+      className="image-alt-details"
+      aria-label={`Detalhes da imagem sem alt: ${imageName}`}
+    >
+      <div className="image-alt-heading">
+        <div>
+          <small>Imagem afetada</small>
+          <strong>{imageName}</strong>
+        </div>
+        <span>atributo alt ausente</span>
+      </div>
+
+      <dl className="image-alt-grid">
+        <div className="image-alt-field wide">
+          <dt>URL exata da imagem</dt>
+          <dd className="image-alt-address">
+            {issue.targetUrl ? (
+              <>
+                <a href={issue.targetUrl} target="_blank" rel="noreferrer">
+                  {issue.targetUrl}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onCopyUrl(issue.targetUrl!)}
+                  aria-label={`Copiar URL da imagem ${imageName}`}
+                >
+                  {copiedUrl === issue.targetUrl ? 'URL copiada' : 'Copiar URL'}
+                </button>
+              </>
+            ) : (
+              <span>O elemento não possui uma URL pública identificável.</span>
+            )}
+          </dd>
+        </div>
+
+        <div className="image-alt-field">
+          <dt>Hospedada em</dt>
+          <dd>
+            <strong>{imageHost}</strong>
+            <span className={`origin-label ${externalResource ? 'external' : ''}`}>
+              {externalResource ? 'domínio externo' : 'mesmo domínio'}
+            </span>
+          </dd>
+        </div>
+
+        <div className="image-alt-field">
+          <dt>Site analisado</dt>
+          <dd><strong>{pageHost}</strong></dd>
+        </div>
+
+        <div className="image-alt-field wide">
+          <dt>Encontrada na página</dt>
+          <dd className="image-alt-page">
+            <a href={issue.pageUrl} target="_blank" rel="noreferrer">
+              {issue.pageUrl}
+            </a>
+          </dd>
+        </div>
+
+        <div className="image-alt-field">
+          <dt>Regra da auditoria</dt>
+          <dd><code>{issue.code}</code></dd>
+        </div>
+
+        <div className="image-alt-field">
+          <dt>Estado encontrado</dt>
+          <dd><code>alt</code> não está presente no elemento.</dd>
+        </div>
+      </dl>
+
+      {issue.element && (
+        <div className="image-alt-element">
+          <span>Elemento HTML encontrado</span>
+          <pre><code>{issue.element}</code></pre>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function exportReport(report: AuditReport) {
   const content = JSON.stringify(report, null, 2);
   const blob = new Blob([content], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
-  let hostname = 'pagina';
+  let exportHostname = 'pagina';
 
   try {
-    hostname = new URL(report.finalUrl).hostname.replace(/[^a-z0-9.-]/gi, '-');
+    exportHostname = new URL(report.finalUrl).hostname.replace(/[^a-z0-9.-]/gi, '-');
   } catch {
-    hostname = 'pagina';
+    exportHostname = 'pagina';
   }
 
   anchor.href = url;
-  anchor.download = `rastreiaweb-${hostname}-${report.analyzedAt.slice(0, 10)}.json`;
+  anchor.download = `rastreiaweb-${exportHostname}-${report.analyzedAt.slice(0, 10)}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -104,6 +223,7 @@ export function ReportView({ onNavigate, report }: ReportViewProps) {
           issue.code,
           issue.description,
           issue.element,
+          issue.pageUrl,
           issue.targetUrl,
         ].some((value) => value?.toLowerCase().includes(normalizedQuery))),
       )
@@ -261,6 +381,7 @@ export function ReportView({ onNavigate, report }: ReportViewProps) {
               <ol className="issue-list refined">
                 {filteredIssues.map((issue, index) => {
                   const result = issueOutcome(issue);
+                  const imageWithoutAlt = issue.code === 'IMAGE_ALT_MISSING';
                   return (
                     <li className={`issue-card ${result} ${issue.severity}`} key={`${issue.code}-${issue.targetUrl ?? index}-${index}`}>
                       <div className="issue-topline">
@@ -275,7 +396,13 @@ export function ReportView({ onNavigate, report }: ReportViewProps) {
                         <h3>{issue.description}</h3>
                       </div>
 
-                      {issue.targetUrl && (
+                      {imageWithoutAlt ? (
+                        <ImageAltDetails
+                          copiedUrl={copiedUrl}
+                          issue={issue}
+                          onCopyUrl={copyUrl}
+                        />
+                      ) : issue.targetUrl && (
                         <div className="issue-target">
                           <a href={issue.targetUrl} target="_blank" rel="noreferrer">{issue.targetUrl}</a>
                           <button type="button" onClick={() => copyUrl(issue.targetUrl!)}>
@@ -284,7 +411,7 @@ export function ReportView({ onNavigate, report }: ReportViewProps) {
                         </div>
                       )}
 
-                      {(issue.element || issue.pageUrl) && (
+                      {!imageWithoutAlt && (issue.element || issue.pageUrl) && (
                         <details className="issue-evidence">
                           <summary>Ver evidências técnicas</summary>
                           <dl>

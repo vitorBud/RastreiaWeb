@@ -48,4 +48,34 @@ describe('createDocumentInventory', () => {
       }),
     ]);
   });
+
+  it('preserva cada imagem e diferencia alt ausente de alt vazio', async () => {
+    const inventory = await createDocumentInventory(`
+      <!doctype html>
+      <html lang="pt-BR">
+        <body>
+          <img src="/marca.png" alt="Marca da empresa">
+          <img src="/marca.png">
+          <img src="https://cdn.example.net/divisor.svg" alt="">
+        </body>
+      </html>
+    `, 'https://example.com/inicio');
+
+    expect(inventory.images).toHaveLength(3);
+    expect(inventory.images).toEqual([
+      expect.objectContaining({
+        alt: 'Marca da empresa',
+        targetUrl: 'https://example.com/marca.png',
+      }),
+      expect.objectContaining({
+        alt: null,
+        element: expect.stringContaining('src="/marca.png"'),
+        targetUrl: 'https://example.com/marca.png',
+      }),
+      expect.objectContaining({
+        alt: '',
+        targetUrl: 'https://cdn.example.net/divisor.svg',
+      }),
+    ]);
+  });
 });
