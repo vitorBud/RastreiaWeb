@@ -155,7 +155,13 @@ const report: AuditReport = {
 
 describe('ReportView', () => {
   it('resume a medição responsiva por viewport', () => {
-    render(<ReportView onNavigate={vi.fn()} report={report} />);
+    render(
+      <ReportView
+        initialFocus={{ category: 'responsive' }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
 
     expect(screen.getByRole('heading', { name: 'Responsividade' })).toBeInTheDocument();
     expect(screen.getByText('Desktop')).toBeInTheDocument();
@@ -166,7 +172,13 @@ describe('ReportView', () => {
   });
 
   it('detalha a largura quebrada e o elemento responsável', () => {
-    render(<ReportView onNavigate={vi.fn()} report={report} />);
+    render(
+      <ReportView
+        initialFocus={{ category: 'responsive' }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
 
     expect(screen.getByText(/Quebra detectada em 390px/)).toBeInTheDocument();
     expect(screen.getByText(/ultrapassou a tela em 230px/)).toBeInTheDocument();
@@ -179,6 +191,7 @@ describe('ReportView', () => {
   it('não apresenta o resultado responsivo como conclusivo quando falta CSS', () => {
     render(
       <ReportView
+        initialFocus={{ category: 'responsive' }}
         onNavigate={vi.fn()}
         report={{
           ...report,
@@ -213,7 +226,13 @@ describe('ReportView', () => {
   });
 
   it('mostra exatamente qual imagem está sem alt e onde ela foi encontrada', () => {
-    render(<ReportView onNavigate={vi.fn()} report={report} />);
+    render(
+      <ReportView
+        initialFocus={{ category: 'accessibility' }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
 
     fireEvent.click(screen.getByText('banner-home.jpg'));
     const details = screen.getByRole('region', {
@@ -238,7 +257,13 @@ describe('ReportView', () => {
   });
 
   it('permite localizar a ocorrência pela página de origem', () => {
-    render(<ReportView onNavigate={vi.fn()} report={report} />);
+    render(
+      <ReportView
+        initialFocus={{ category: 'accessibility' }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar filtros' }));
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar' }), {
@@ -264,8 +289,8 @@ describe('ReportView', () => {
       />,
     );
 
-    expect(screen.getByRole('combobox', { name: 'Categoria' }))
-      .toHaveValue('accessibility');
+    expect(screen.getByRole('button', { name: /Acessibilidade/ }))
+      .toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox', { name: 'Buscar' }))
       .toHaveValue('IMAGE_ALT_MISSING');
     expect(screen.getByText(
@@ -273,6 +298,27 @@ describe('ReportView', () => {
     )).toBeInTheDocument();
     expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
     expect(screen.queryByText('Verificação inconclusiva.')).not.toBeInTheDocument();
+  });
+
+  it('mantém links, responsividade e acessibilidade em áreas independentes', () => {
+    render(<ReportView onNavigate={vi.fn()} report={report} />);
+
+    expect(screen.getByText('Link quebrado confirmado.')).toBeInTheDocument();
+    expect(screen.queryByText(
+      'A imagem "banner-home.jpg" foi encontrada sem o atributo alt.',
+    )).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Responsividade' }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Acessibilidade/ }));
+    expect(screen.getByText(
+      'A imagem "banner-home.jpg" foi encontrada sem o atributo alt.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Responsividade/ }));
+    expect(screen.getByRole('heading', { name: 'Responsividade' })).toBeInTheDocument();
+    expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
   });
 
   it('organiza todos os links em uma seção separada', () => {

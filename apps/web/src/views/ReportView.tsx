@@ -30,6 +30,17 @@ const categoryLabels: Record<AuditCategory, string> = {
   responsive: 'Responsividade',
 };
 
+const reportCategories: Array<{
+  category: AuditCategory;
+  className: string;
+  description: string;
+}> = [
+  { category: 'link', className: 'violet', description: 'Erros HTTP, bloqueios e redirecionamentos' },
+  { category: 'responsive', className: 'blue', description: 'Quebras por largura e elementos fora da tela' },
+  { category: 'accessibility', className: 'green', description: 'Imagens sem alt e barreiras automáticas' },
+  { category: 'resource', className: 'pink', description: 'Imagens, scripts e folhas de estilo' },
+];
+
 const severityLabels: Record<AuditSeverity, string> = {
   critical: 'Crítica',
   serious: 'Séria',
@@ -329,26 +340,28 @@ function exportReport(report: AuditReport) {
 }
 
 export function ReportView({ initialFocus = {}, onNavigate, report }: ReportViewProps) {
-  const [category, setCategory] = useState<'all' | AuditCategory>(
-    initialFocus.category ?? 'all',
-  );
+  const initialCategory = initialFocus.category ?? 'link';
+  const [category, setCategory] = useState<AuditCategory>(initialCategory);
   const [severity, setSeverity] = useState<'all' | AuditSeverity>('all');
   const [outcome, setOutcome] = useState<'all' | IssueOutcome>('all');
   const [query, setQuery] = useState(initialFocus.query ?? '');
   const [copiedUrl, setCopiedUrl] = useState('');
   const [section, setSection] = useState<'issues' | 'links'>(
-    initialFocus.section ?? 'issues',
+    initialCategory === 'link' ? initialFocus.section ?? 'issues' : 'issues',
   );
   const [visibleIssueCount, setVisibleIssueCount] = useState(15);
   const [showFilters, setShowFilters] = useState(
-    Boolean(initialFocus.category || initialFocus.query),
+    Boolean(initialFocus.query),
+  );
+  const categoryIssues = useMemo(
+    () => report?.issues.filter((issue) => issue.category === category) ?? [],
+    [category, report],
   );
   const filteredIssues = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return report?.issues
+    return categoryIssues
       .filter((issue) =>
-        (category === 'all' || issue.category === category) &&
         (severity === 'all' || issue.severity === severity) &&
         (outcome === 'all' || issueOutcome(issue) === outcome) &&
         (!normalizedQuery || [
@@ -359,8 +372,8 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
           issue.targetUrl,
         ].some((value) => value?.toLowerCase().includes(normalizedQuery))),
       )
-      .sort((first, second) => severityOrder[first.severity] - severityOrder[second.severity]) ?? [];
-  }, [category, outcome, query, report, severity]);
+      .sort((first, second) => severityOrder[first.severity] - severityOrder[second.severity]);
+  }, [categoryIssues, outcome, query, severity]);
   const visibleIssues = filteredIssues.slice(0, visibleIssueCount);
 
   useEffect(() => {
@@ -371,8 +384,16 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
     setSection(nextSection);
   }
 
+  function changeCategory(nextCategory: AuditCategory) {
+    setCategory(nextCategory);
+    setSection('issues');
+    setSeverity('all');
+    setOutcome('all');
+    setQuery('');
+    setShowFilters(false);
+  }
+
   function clearFilters() {
-    setCategory('all');
     setSeverity('all');
     setOutcome('all');
     setQuery('');
@@ -403,13 +424,12 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
 
   const severityCounts = Object.keys(severityLabels).reduce((counts, item) => ({
     ...counts,
-    [item]: report.issues.filter((issue) => issue.severity === item).length,
+    [item]: categoryIssues.filter((issue) => issue.severity === item).length,
   }), {} as Record<AuditSeverity, number>);
   const inconclusiveCount = report.issues.filter(
     (issue) => issue.code === 'ACCESS_RESTRICTED',
   ).length;
   const activeFilterCount = [
-    category !== 'all',
     severity !== 'all',
     outcome !== 'all',
     Boolean(query.trim()),
@@ -464,8 +484,34 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
         </div>
       </details>
 
-      <ResponsiveOverview report={report} />
+      <nav className="report-category-nav" aria-label="Áreas do relatório">
+        {reportCategories.map((item) => {
+          const count = report.issues.filter(
+            (issue) => issue.category === item.category,
+          ).length;
 
+          return (
+            <button
+              type="button"
+              className={category === item.category ? 'active' : ''}
+              aria-pressed={category === item.category}
+              key={item.category}
+              onClick={() => changeCategory(item.category)}
+            >
+              <span className={`report-category-icon ${item.className}`} aria-hidden="true" />
+              <span>
+                <strong>{categoryLabels[item.category]}</strong>
+                <small>{item.description}</small>
+              </span>
+              <b>{count}</b>
+            </button>
+          );
+        })}
+      </nav>
+
+      {category === 'responsive' && <ResponsiveOverview report={report} />}
+
+      {category === 'link' && (
       <nav className="report-sections page-panel" aria-label="Conteúdo do relatório">
         <button
           type="button"
@@ -473,8 +519,8 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
           aria-pressed={section === 'issues'}
           onClick={() => changeSection('issues')}
         >
-          <span>Ocorrências</span>
-          <strong>{report.issues.length}</strong>
+          <span>Problemas de links</span>
+          <strong>{categoryIssues.length}</strong>
         </button>
         <button
           type="button"
@@ -486,17 +532,18 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
           <strong>{report.links.length}</strong>
         </button>
       </nav>
+      )}
 
       <div
         className={`report-section-content report-section-${section}`}
-        key={section}
+        key={`${category}-${section}`}
       >
       {section === 'issues' ? (
           <div className="issues-panel page-panel">
             <div className="issues-toolbar">
               <div>
-                <span className="card-eyebrow">Ocorrências técnicas</span>
-                <h2>{filteredIssues.length} de {report.issues.length} resultado(s)</h2>
+                <span className="card-eyebrow">Relatório de {categoryLabels[category].toLowerCase()}</span>
+                <h2>{filteredIssues.length} de {categoryIssues.length} resultado(s)</h2>
               </div>
               <button
                 className="secondary-button filter-toggle"
@@ -539,21 +586,6 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
                     />
                   </label>
                   <fieldset>
-                    <legend>Categoria</legend>
-                    <select
-                      aria-label="Categoria"
-                      value={category}
-                      onChange={(event) => setCategory(
-                        event.target.value as 'all' | AuditCategory,
-                      )}
-                    >
-                      <option value="all">Todas</option>
-                      {Object.entries(categoryLabels).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                  </fieldset>
-                  <fieldset>
                     <legend>Resultado</legend>
                     <select
                       aria-label="Resultado"
@@ -594,8 +626,12 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
               {filteredIssues.length === 0 ? (
                   <div className="no-issues">
                     <Icon name="shield" />
-                    <strong>Nenhuma ocorrência para estes filtros</strong>
-                    <span>Isso não garante ausência total de problemas; mantenha revisões manuais.</span>
+                    <strong>
+                      {categoryIssues.length === 0
+                        ? `Nenhuma ocorrência de ${categoryLabels[category].toLowerCase()}`
+                        : 'Nenhuma ocorrência para estes filtros'}
+                    </strong>
+                    <span>Esta área é independente das outras categorias e mantém seus próprios resultados.</span>
                   </div>
                 ) : (
                   <ol className="issue-list refined">
@@ -610,7 +646,6 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
                           <div className="issue-topline">
                             <span className={`outcome-badge ${result}`}>{outcomeLabels[result]}</span>
                             <span className={`severity-badge ${issue.severity}`}>{severityLabels[issue.severity]}</span>
-                            <span>{categoryLabels[issue.category]}</span>
                             {issue.statusCode !== undefined && <span>HTTP {issue.statusCode}</span>}
                           </div>
 
