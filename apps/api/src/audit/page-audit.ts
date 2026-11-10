@@ -1,7 +1,9 @@
 import {
+  analyzeResponsiveLayout,
   createDocumentInventory,
   type DocumentInventory,
   type DocumentLink,
+  type ResponsiveStylesheet,
 } from '@rastreiaweb/audit-engine';
 import type {
   AuditIssue,
@@ -10,6 +12,7 @@ import type {
   AuditProgress,
   AuditReport,
   AuditSeverity,
+  ResponsiveAuditResult,
 } from '@rastreiaweb/shared';
 import {
   AuditNetworkError,
@@ -39,6 +42,7 @@ export interface PageAuditOptions {
 }
 
 interface PageAuditDependencies {
+  analyzeResponsive?: typeof analyzeResponsiveLayout;
   createInventory?: typeof createDocumentInventory;
   requestUrl?: typeof requestPublicUrl;
 }
@@ -265,6 +269,46 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+async function loadResponsiveStylesheets(
+  inventory: DocumentInventory,
+  maxResources: number,
+  requestUrl: typeof requestPublicUrl,
+): Promise<ResponsiveStylesheet[]> {
+  const stylesheetResources = inventory.resources
+    .filter((resource) => resource.kind === 'stylesheet')
+    .slice(0, Math.min(maxResources, 4));
+  const stylesheets = await mapWithConcurrency(
+    stylesheetResources,
+    4,
+    async (resource): Promise<ResponsiveStylesheet | null> => {
+      try {
+        const response = await requestUrl(resource.targetUrl, {
+          maxBodyBytes: 300_000,
+          maxRedirects: 2,
+          method: 'GET',
+          readBody: true,
+          timeoutMs: 2_500,
+        });
+
+        if (response.statusCode >= 400 || !response.body) {
+          return null;
+        }
+
+        return {
+          content: response.body,
+          sourceUrl: response.finalUrl,
+        };
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  return stylesheets.filter(
+    (stylesheet): stylesheet is ResponsiveStylesheet => stylesheet !== null,
+  );
+}
+
 export async function auditPage(
   inputUrl: string,
   options: PageAuditOptions = {},
@@ -276,6 +320,7 @@ export async function auditPage(
   const onProgress = options.onProgress;
   const requestUrl = dependencies.requestUrl ?? requestPublicUrl;
   const createInventory = dependencies.createInventory ?? createDocumentInventory;
+  const analyzeResponsive = dependencies.analyzeResponsive ?? analyzeResponsiveLayout;
   onProgress?.({
     completed: 0,
     message: 'Baixando a página principal…',
@@ -411,10 +456,77 @@ export async function auditPage(
     reportCheckProgress,
   );
 
+  onProgress?.({
+    completed: 0,
+    message: 'Preparando o layout para desktop, tablet e celular…',
+    percent: 89,
+    phase: 'responsive',
+    total: 3,
+  });
+
+  let responsive: ResponsiveAuditResult;
+
+  try {
+    const stylesheets = await loadResponsiveStylesheets(
+      inventory,
+      maxResources,
+      requestUrl,
+    );
+    responsive = await analyzeResponsive(
+      pageResponse.body,
+      pageResponse.finalUrl,
+      stylesheets,
+      (completed, total) => {
+        onProgress?.({
+          completed,
+          message: `Medindo responsividade (${completed} de ${total} resoluções)…`,
+          percent: 89 + Math.round((completed / total) * 5),
+          phase: 'responsive',
+          total,
+        });
+      },
+    );
+  } catch {
+    responsive = {
+      message: 'Não foi possível iniciar o navegador isolado para medir a responsividade.',
+      status: 'unavailable',
+      viewports: [],
+    };
+  }
+
   issues.push(
     ...linkResults.flatMap((result) => result.issues),
     ...resourceResults.flatMap((result) => result.issues),
   );
+
+  if (responsive.status === 'completed') {
+    issues.push(...responsive.viewports.flatMap((viewport) => {
+      if (!viewport.horizontalOverflow) {
+        return [];
+      }
+
+      if (viewport.overflowingElements.length === 0) {
+        return [{
+          category: 'responsive' as const,
+          code: 'HORIZONTAL_OVERFLOW',
+          description: `A página possui ${viewport.documentWidth - viewport.width}px de rolagem horizontal na resolução ${viewport.width} × ${viewport.height}px.`,
+          pageUrl: pageResponse.finalUrl,
+          severity: 'moderate' as const,
+          suggestion: 'Revise larguras fixas, min-width, margens e posicionamentos que ultrapassam a largura da viewport.',
+        }];
+      }
+
+      return viewport.overflowingElements.map((element) => ({
+        category: 'responsive' as const,
+        code: 'ELEMENT_OUTSIDE_VIEWPORT',
+        description: `O elemento "${element.selector}" ultrapassa em ${element.overflowPixels}px a viewport de ${viewport.width} × ${viewport.height}px.`,
+        element: element.element,
+        pageUrl: pageResponse.finalUrl,
+        severity: 'moderate' as const,
+        suggestion: 'Evite larguras rígidas maiores que a tela. Prefira max-width: 100%, unidades fluidas e media queries adequadas.',
+      }));
+    }));
+  }
   const linkResultByCheckUrl = new Map<string, TargetCheckResult>();
 
   linksToCheck.forEach((link, index) => {
@@ -456,14 +568,14 @@ export async function auditPage(
   onProgress?.({
     completed: totalChecks,
     message: 'Organizando ocorrências e preparando o relatório…',
-    percent: 94,
+    percent: 97,
     phase: 'reporting',
     total: totalChecks,
   });
 
   const report: AuditReport = {
     analyzedAt: new Date().toISOString(),
-    disclaimer: 'Esta análise automática não substitui testes manuais completos de acessibilidade e experiência.',
+    disclaimer: 'Esta análise automática não substitui testes manuais de acessibilidade e responsividade. A medição responsiva usa HTML e CSS públicos, com JavaScript e novas requisições do navegador bloqueados.',
     durationMs: Date.now() - startedAt,
     finalUrl: pageResponse.finalUrl,
     initialUrl: inputUrl,
@@ -471,6 +583,7 @@ export async function auditPage(
     links: auditedLinks,
     limits: { maxLinks, maxResources },
     pageTitle: inventory.title || new URL(pageResponse.finalUrl).hostname,
+    responsive,
     summary: {
       brokenLinks: linkResults.filter((result) => result.state === 'broken').length,
       failedResources: resourceResults.filter((result) =>

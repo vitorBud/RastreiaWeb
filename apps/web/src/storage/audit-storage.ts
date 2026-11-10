@@ -69,6 +69,30 @@ function isStoredLink(value: unknown): value is AuditReport['links'][number] {
   );
 }
 
+function isStoredResponsiveResult(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.message === 'string' &&
+    ['completed', 'unavailable'].includes(String(value.status)) &&
+    Array.isArray(value.viewports) &&
+    value.viewports.every((viewport) =>
+      isRecord(viewport) &&
+      typeof viewport.documentWidth === 'number' &&
+      typeof viewport.height === 'number' &&
+      typeof viewport.horizontalOverflow === 'boolean' &&
+      ['desktop', 'mobile', 'tablet'].includes(String(viewport.name)) &&
+      Array.isArray(viewport.overflowingElements) &&
+      viewport.overflowingElements.every((element) =>
+        isRecord(element) &&
+        typeof element.element === 'string' &&
+        typeof element.overflowPixels === 'number' &&
+        typeof element.selector === 'string'
+      ) &&
+      typeof viewport.width === 'number'
+    )
+  );
+}
+
 function isStoredReport(item: unknown): item is StoredAuditReport {
   if (!isRecord(item) || !isRecord(item.limits) || !isRecord(item.summary)) {
     return false;
@@ -111,6 +135,7 @@ function isStoredReport(item: unknown): item is StoredAuditReport {
     typeof item.limits.maxLinks === 'number' &&
     typeof item.limits.maxResources === 'number' &&
     typeof item.pageTitle === 'string' &&
+    (item.responsive === undefined || isStoredResponsiveResult(item.responsive)) &&
     summaryFields.every((field) => typeof item.summary[field] === 'number') &&
     (item.summary.restrictedLinks === undefined ||
       typeof item.summary.restrictedLinks === 'number') &&

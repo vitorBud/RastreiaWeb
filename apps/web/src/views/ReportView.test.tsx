@@ -102,6 +102,40 @@ const report: AuditReport = {
   ],
   limits: { maxLinks: 20, maxResources: 20 },
   pageTitle: 'Exemplo',
+  responsive: {
+    message: 'Layout medido em três resoluções.',
+    status: 'completed',
+    viewports: [
+      {
+        documentWidth: 1440,
+        height: 900,
+        horizontalOverflow: false,
+        name: 'desktop',
+        overflowingElements: [],
+        width: 1440,
+      },
+      {
+        documentWidth: 768,
+        height: 1024,
+        horizontalOverflow: false,
+        name: 'tablet',
+        overflowingElements: [],
+        width: 768,
+      },
+      {
+        documentWidth: 620,
+        height: 844,
+        horizontalOverflow: true,
+        name: 'mobile',
+        overflowingElements: [{
+          element: '<main class="wide">Conteúdo</main>',
+          overflowPixels: 230,
+          selector: 'main.wide',
+        }],
+        width: 390,
+      },
+    ],
+  },
   summary: {
     brokenLinks: 1,
     failedResources: 0,
@@ -119,6 +153,17 @@ const report: AuditReport = {
 };
 
 describe('ReportView', () => {
+  it('resume a medição responsiva por viewport', () => {
+    render(<ReportView onNavigate={vi.fn()} report={report} />);
+
+    expect(screen.getByRole('heading', { name: 'Responsividade' })).toBeInTheDocument();
+    expect(screen.getByText('Desktop')).toBeInTheDocument();
+    expect(screen.getByText('Tablet')).toBeInTheDocument();
+    expect(screen.getByText('Celular')).toBeInTheDocument();
+    expect(screen.getByText('Overflow detectado')).toBeInTheDocument();
+    expect(screen.getAllByText('Sem overflow horizontal')).toHaveLength(2);
+  });
+
   it('distingue problemas confirmados de verificações inconclusivas', () => {
     render(<ReportView onNavigate={vi.fn()} report={report} />);
 

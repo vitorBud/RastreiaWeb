@@ -5,6 +5,14 @@ export {
   type DocumentLink,
   type DocumentResource,
 } from './document-inventory.js';
+export {
+  analyzeResponsiveLayout,
+  type ResponsiveLayoutResult,
+  type ResponsiveOverflowElement,
+  type ResponsiveStylesheet,
+  type ResponsiveViewportName,
+  type ResponsiveViewportResult,
+} from './responsive-layout.js';
 
 export interface AuditEngineStatus {
   ready: boolean;

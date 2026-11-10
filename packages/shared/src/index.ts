@@ -58,6 +58,29 @@ export interface AuditSummary {
   unreachableLinks: number;
 }
 
+export type ResponsiveViewportName = 'desktop' | 'mobile' | 'tablet';
+
+export interface ResponsiveOverflowElement {
+  element: string;
+  overflowPixels: number;
+  selector: string;
+}
+
+export interface ResponsiveViewportResult {
+  documentWidth: number;
+  height: number;
+  horizontalOverflow: boolean;
+  name: ResponsiveViewportName;
+  overflowingElements: ResponsiveOverflowElement[];
+  width: number;
+}
+
+export interface ResponsiveAuditResult {
+  message: string;
+  status: 'completed' | 'unavailable';
+  viewports: ResponsiveViewportResult[];
+}
+
 export interface AuditReport {
   analyzedAt: string;
   disclaimer: string;
@@ -71,6 +94,7 @@ export interface AuditReport {
     maxResources: number;
   };
   pageTitle: string;
+  responsive?: ResponsiveAuditResult;
   summary: AuditSummary;
 }
 
@@ -78,6 +102,7 @@ export type AuditProgressPhase =
   | 'downloading'
   | 'inventory'
   | 'checking'
+  | 'responsive'
   | 'reporting'
   | 'complete';
 

@@ -13,9 +13,9 @@ export function NewAuditView(props: NewAuditViewProps) {
   return (
     <section className="page-panel audit-page">
       <div className="page-intro">
-        <span className="card-eyebrow">Auditoria v0.1</span>
+        <span className="card-eyebrow">Auditoria v0.2</span>
         <h2>Analise uma página pública</h2>
-        <p>O RastreiaWeb verifica uma única página, respeitando limites de rede e quantidade de recursos.</p>
+        <p>O RastreiaWeb verifica uma única página, seus recursos e o layout em três resoluções.</p>
       </div>
 
       <AuditForm

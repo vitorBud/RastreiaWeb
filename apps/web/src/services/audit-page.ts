@@ -58,6 +58,30 @@ function isAuditLinkResult(value: unknown): boolean {
   );
 }
 
+function isResponsiveAuditResult(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.message === 'string' &&
+    ['completed', 'unavailable'].includes(String(value.status)) &&
+    Array.isArray(value.viewports) &&
+    value.viewports.every((viewport) =>
+      isRecord(viewport) &&
+      typeof viewport.documentWidth === 'number' &&
+      typeof viewport.height === 'number' &&
+      typeof viewport.horizontalOverflow === 'boolean' &&
+      ['desktop', 'mobile', 'tablet'].includes(String(viewport.name)) &&
+      Array.isArray(viewport.overflowingElements) &&
+      viewport.overflowingElements.every((element) =>
+        isRecord(element) &&
+        typeof element.element === 'string' &&
+        typeof element.overflowPixels === 'number' &&
+        typeof element.selector === 'string'
+      ) &&
+      typeof viewport.width === 'number'
+    )
+  );
+}
+
 function isAuditReport(value: unknown): value is AuditReport {
   if (
     !isRecord(value) ||
@@ -91,6 +115,7 @@ function isAuditReport(value: unknown): value is AuditReport {
     typeof value.finalUrl === 'string' &&
     typeof value.initialUrl === 'string' &&
     typeof value.pageTitle === 'string' &&
+    (value.responsive === undefined || isResponsiveAuditResult(value.responsive)) &&
     typeof value.limits.maxLinks === 'number' &&
     typeof value.limits.maxResources === 'number' &&
     summaryFields.every((field) => typeof value.summary[field] === 'number') &&
@@ -114,7 +139,7 @@ function isAuditProgress(value: unknown): value is AuditProgress {
     typeof value.percent === 'number' &&
     value.percent >= 0 &&
     value.percent <= 100 &&
-    ['downloading', 'inventory', 'checking', 'reporting', 'complete']
+    ['downloading', 'inventory', 'checking', 'responsive', 'reporting', 'complete']
       .includes(typeof value.phase === 'string' ? value.phase : '') &&
     typeof value.total === 'number'
   );

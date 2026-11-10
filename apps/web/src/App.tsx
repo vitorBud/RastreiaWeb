@@ -257,7 +257,7 @@ export function App() {
         </div>
 
         <footer className="dashboard-footer">
-          <span>RastreiaWeb v0.1</span>
+          <span>RastreiaWeb v0.2</span>
           <span>Testes automáticos não garantem acessibilidade completa.</span>
         </footer>
       </main>

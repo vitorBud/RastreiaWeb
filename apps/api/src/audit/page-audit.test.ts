@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ResponsiveAuditResult } from '@rastreiaweb/shared';
 import { auditPage } from './page-audit.js';
 import type { PublicHttpResponse } from './public-http-client.js';
 
@@ -9,6 +10,19 @@ const pageResponse: PublicHttpResponse = {
   redirects: [],
   statusCode: 200,
 };
+
+const analyzeResponsive = vi.fn(async (): Promise<ResponsiveAuditResult> => ({
+  message: 'Três resoluções analisadas.',
+  status: 'completed',
+  viewports: [{
+    documentWidth: 390,
+    height: 844,
+    horizontalOverflow: false,
+    name: 'mobile',
+    overflowingElements: [],
+    width: 390,
+  }],
+}));
 
 describe('auditPage', () => {
   it('gera um relatório a partir de links, imagens e recursos reais', async () => {
@@ -52,6 +66,7 @@ describe('auditPage', () => {
     const onProgress = vi.fn();
 
     const report = await auditPage('https://example.com', { onProgress }, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -94,7 +109,8 @@ describe('auditPage', () => {
       28,
       58,
       88,
-      94,
+      89,
+      97,
       100,
     ]);
   });
@@ -158,6 +174,7 @@ describe('auditPage', () => {
     }));
 
     const report = await auditPage('https://example.com', { maxLinks: 1 }, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -247,6 +264,7 @@ describe('auditPage', () => {
     }));
 
     const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -310,6 +328,7 @@ describe('auditPage', () => {
     }));
 
     const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -346,6 +365,7 @@ describe('auditPage', () => {
     }));
 
     const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -409,6 +429,7 @@ describe('auditPage', () => {
     }));
 
     const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive,
       createInventory,
       requestUrl,
     });
@@ -429,5 +450,48 @@ describe('auditPage', () => {
       redirects: 1,
       unreachableLinks: 1,
     });
+  });
+
+  it('transforma elementos fora da viewport em ocorrências detalhadas', async () => {
+    const requestUrl = vi.fn(async (): Promise<PublicHttpResponse> => pageResponse);
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [],
+      resources: [],
+      title: 'Exemplo responsivo',
+    }));
+    const responsiveAnalyzer = vi.fn(async (): Promise<ResponsiveAuditResult> => ({
+      message: 'Três resoluções analisadas.',
+      status: 'completed',
+      viewports: [{
+        documentWidth: 620,
+        height: 844,
+        horizontalOverflow: true,
+        name: 'mobile',
+        overflowingElements: [{
+          element: '<main class="wide">Conteúdo</main>',
+          overflowPixels: 230,
+          selector: 'main.wide',
+        }],
+        width: 390,
+      }],
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive: responsiveAnalyzer,
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.responsive?.status).toBe('completed');
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        category: 'responsive',
+        code: 'ELEMENT_OUTSIDE_VIEWPORT',
+        description: expect.stringContaining('main.wide'),
+        element: '<main class="wide">Conteúdo</main>',
+      }),
+    ]);
+    expect(report.summary.totalIssues).toBe(1);
   });
 });

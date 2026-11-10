@@ -31,7 +31,7 @@ const categories: Array<{
 }> = [
   { category: 'link', className: 'violet', description: 'Status e redirecionamentos', label: 'Links' },
   { category: 'resource', className: 'pink', description: 'Imagens, CSS e JavaScript', label: 'Recursos' },
-  { category: 'responsive', className: 'blue', description: 'Planejado para a v0.2', label: 'Responsividade' },
+  { category: 'responsive', className: 'blue', description: 'Desktop, tablet e celular', label: 'Responsividade' },
   { category: 'accessibility', className: 'green', description: 'Alternativas textuais iniciais', label: 'Acessibilidade' },
 ];
 
@@ -128,9 +128,7 @@ export function DashboardView(props: DashboardViewProps) {
                   <span className={`category-icon ${item.className}`} aria-hidden="true" />
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>
                   <span className="pending-badge">
-                    {report && item.category !== 'responsive'
-                      ? issueCount(item.category)
-                      : item.category === 'responsive' ? 'Em breve' : '—'}
+                    {report ? issueCount(item.category) : '—'}
                   </span>
                 </button>
               </li>
@@ -141,7 +139,7 @@ export function DashboardView(props: DashboardViewProps) {
         <article className="card scope-card">
           <div className="card-heading">
             <span>Escopo atual</span>
-            <span className="scope-count">v0.1</span>
+            <span className="scope-count">v0.2</span>
           </div>
           <div className="scope-grid">
             <div><small>Destinos verificados</small><strong>{report?.summary.linksChecked ?? 0}</strong><span>de {report?.summary.linksFound ?? 0} destinos HTTP únicos</span></div>

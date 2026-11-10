@@ -52,6 +52,62 @@ const severityOrder: Record<AuditSeverity, number> = {
   minor: 3,
 };
 
+const viewportLabels = {
+  desktop: 'Desktop',
+  mobile: 'Celular',
+  tablet: 'Tablet',
+} as const;
+
+function ResponsiveOverview({ report }: { report: AuditReport }) {
+  const result = report.responsive;
+
+  if (!result) {
+    return null;
+  }
+
+  return (
+    <section className="responsive-overview page-panel" aria-labelledby="responsive-title">
+      <div className="responsive-overview-heading">
+        <div>
+          <span className="card-eyebrow">Teste por resolução</span>
+          <h2 id="responsive-title">Responsividade</h2>
+          <p>{result.message}</p>
+        </div>
+        <span className={`responsive-analysis-state ${result.status}`}>
+          {result.status === 'completed' ? 'Análise concluída' : 'Análise indisponível'}
+        </span>
+      </div>
+
+      {result.status === 'completed' && (
+        <div className="responsive-viewport-grid">
+          {result.viewports.map((viewport) => {
+            const issueCount = viewport.overflowingElements.length;
+
+            return (
+              <article
+                className={viewport.horizontalOverflow ? 'attention' : 'clean'}
+                key={viewport.name}
+              >
+                <div>
+                  <span>{viewportLabels[viewport.name]}</span>
+                  <strong>{viewport.width} × {viewport.height}</strong>
+                </div>
+                <span className="responsive-viewport-state">
+                  {viewport.horizontalOverflow ? 'Overflow detectado' : 'Sem overflow horizontal'}
+                </span>
+                <dl>
+                  <div><dt>Largura do documento</dt><dd>{viewport.documentWidth}px</dd></div>
+                  <div><dt>Elementos sinalizados</dt><dd>{issueCount}</dd></div>
+                </dl>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function hostname(url: string | undefined): string {
   if (!url) {
     return 'Não informado';
@@ -346,6 +402,8 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
           </dl>
         </div>
       </details>
+
+      <ResponsiveOverview report={report} />
 
       <nav className="report-sections page-panel" aria-label="Conteúdo do relatório">
         <button
