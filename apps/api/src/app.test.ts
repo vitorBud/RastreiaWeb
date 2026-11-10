@@ -85,7 +85,10 @@ describe('POST /api/audits', () => {
         linksChecked: 1,
         linksFound: 1,
         redirects: 0,
+        restrictedLinks: 0,
         resourcesChecked: 0,
+        unavailableLinks: 0,
+        unreachableLinks: 0,
         totalIssues: 0,
       },
     };
@@ -119,8 +122,11 @@ describe('POST /api/audits', () => {
         linksChecked: 0,
         linksFound: 0,
         redirects: 0,
+        restrictedLinks: 0,
         resourcesChecked: 0,
         totalIssues: 0,
+        unavailableLinks: 0,
+        unreachableLinks: 0,
       },
     }));
     const auditApp = createApp({ auditPage });

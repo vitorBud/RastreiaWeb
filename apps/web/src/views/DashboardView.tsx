@@ -1,14 +1,16 @@
 import type { AppView, AuditCategory, AuditReport } from '../types/audit';
 import { AuditForm } from '../components/AuditForm';
+import { AuditHistoryChart } from '../components/AuditHistoryChart';
 import { Icon } from '../components/Icon';
 
 interface DashboardViewProps {
   auditError: string;
-  historyCount: number;
+  history: AuditReport[];
   isAuditing: boolean;
   onAudit: (url: string) => Promise<void>;
   onNavigate: (view: AppView) => void;
   onResetError: () => void;
+  onSelectReport: (report: AuditReport) => void;
   report: AuditReport | null;
 }
 
@@ -36,6 +38,11 @@ export function DashboardView(props: DashboardViewProps) {
   const { report } = props;
   const issueCount = (category: AuditCategory) =>
     report?.issues.filter((issue) => issue.category === category).length ?? 0;
+  const linkCoverage = report
+    ? report.summary.linksFound === 0
+      ? 100
+      : Math.round((report.summary.linksChecked / report.summary.linksFound) * 100)
+    : 0;
 
   return (
     <>
@@ -50,22 +57,33 @@ export function DashboardView(props: DashboardViewProps) {
         <article className="card status-card">
           <div className="card-heading">
             <span>{report ? 'Última auditoria' : 'Status do projeto'}</span>
-            <span className="status-pill"><span />{report ? 'Concluída' : 'Fundação'}</span>
+            <span className="status-pill"><span />{report ? `${report.summary.totalIssues} ocorr.` : 'Fundação'}</span>
           </div>
           <div className="status-value">
-            {report ? `${report.summary.totalIssues} ocorrência(s)` : 'Pronto para analisar'}
+            {report
+              ? report.summary.totalIssues === 0
+                ? 'Nenhuma ocorrência automática'
+                : 'Revisão recomendada'
+              : 'Pronto para analisar'}
           </div>
           <p>
             {report
               ? report.pageTitle
               : 'Informe uma página pública autorizada para gerar o primeiro relatório.'}
           </p>
-          <div className="progress-track" aria-label="Estado da última auditoria">
-            <span />
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-label="Cobertura dos links encontrados"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={linkCoverage}
+          >
+            <span style={{ width: `${linkCoverage}%` }} />
           </div>
           <div className="progress-label">
-            <span>{report ? getHostname(report.finalUrl) : 'Base técnica'}</span>
-            <strong>{report ? `${report.durationMs} ms` : 'Concluída'}</strong>
+            <span>{report ? `Cobertura de links · ${getHostname(report.finalUrl)}` : 'Base técnica'}</span>
+            <strong>{report ? `${linkCoverage}%` : 'Concluída'}</strong>
           </div>
         </article>
 
@@ -90,13 +108,15 @@ export function DashboardView(props: DashboardViewProps) {
           <ul>
             {categories.map((item) => (
               <li key={item.category}>
-                <span className={`category-icon ${item.className}`} aria-hidden="true" />
-                <span><strong>{item.label}</strong><small>{item.description}</small></span>
-                <span className="pending-badge">
-                  {report && item.category !== 'responsive'
-                    ? issueCount(item.category)
-                    : item.category === 'responsive' ? 'Em breve' : '—'}
-                </span>
+                <button type="button" onClick={() => props.onNavigate('reports')}>
+                  <span className={`category-icon ${item.className}`} aria-hidden="true" />
+                  <span><strong>{item.label}</strong><small>{item.description}</small></span>
+                  <span className="pending-badge">
+                    {report && item.category !== 'responsive'
+                      ? issueCount(item.category)
+                      : item.category === 'responsive' ? 'Em breve' : '—'}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -111,15 +131,15 @@ export function DashboardView(props: DashboardViewProps) {
             <div><small>Links verificados</small><strong>{report?.summary.linksChecked ?? 0}</strong><span>de {report?.summary.linksFound ?? 0} encontrados</span></div>
             <div><small>Recursos verificados</small><strong>{report?.summary.resourcesChecked ?? 0}</strong><span>{report?.summary.failedResources ?? 0} com falha</span></div>
             <div><small>Imagens encontradas</small><strong>{report?.summary.imagesFound ?? 0}</strong><span>{report?.summary.imagesWithoutAlt ?? 0} sem alt</span></div>
-            <div><small>Histórico local</small><strong>{props.historyCount}</strong><span>auditorias salvas</span></div>
+            <div><small>Páginas distintas</small><strong>{new Set(props.history.map((item) => item.finalUrl)).size}</strong><span>{props.history.length} auditorias salvas</span></div>
           </div>
         </article>
 
         <article className="card chart-card">
           <div className="chart-header">
             <div>
-              <span className="card-eyebrow">Diagnóstico</span>
-              <h2>{report ? 'Resumo da última página' : 'Aguardando primeira análise'}</h2>
+              <span className="card-eyebrow">Histórico visual</span>
+              <h2>Auditorias recentes</h2>
             </div>
             {report && (
               <button className="secondary-button" type="button" onClick={() => props.onNavigate('reports')}>
@@ -127,30 +147,11 @@ export function DashboardView(props: DashboardViewProps) {
               </button>
             )}
           </div>
-          {report ? (
-            <div className="metric-bars">
-              {categories.slice(0, 3).map((item) => {
-                const count = issueCount(item.category);
-                const width = Math.min(100, count * 12);
-                return (
-                  <div className="metric-row" key={item.category}>
-                    <span>{item.label}</span>
-                    <div><span style={{ width: `${width}%` }} /></div>
-                    <strong>{count}</strong>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-chart">
-              <div className="chart-grid" />
-              <div className="empty-chart-content">
-                <span><Icon name="report" /></span>
-                <strong>O relatório aparecerá aqui</strong>
-                <small>A análise não será simulada: os dados virão da página informada.</small>
-              </div>
-            </div>
-          )}
+          <AuditHistoryChart
+            history={props.history}
+            onCreateAudit={() => props.onNavigate('new-audit')}
+            onSelectReport={props.onSelectReport}
+          />
         </article>
 
         <article className="card next-card">

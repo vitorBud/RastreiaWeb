@@ -179,11 +179,12 @@ export function App() {
         {view === 'dashboard' && (
           <DashboardView
             auditError={auditError}
-            historyCount={history.length}
+            history={history}
             isAuditing={isAuditing}
             onAudit={handleAudit}
             onNavigate={navigate}
             onResetError={() => setAuditError('')}
+            onSelectReport={selectReport}
             report={currentReport}
           />
         )}

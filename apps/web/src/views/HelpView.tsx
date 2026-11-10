@@ -21,7 +21,7 @@ export function HelpView() {
         <article className="page-panel">
           <span>03</span>
           <h3>Revise as ocorrências</h3>
-          <p>Status 403 indica acesso restrito e não é classificado automaticamente como link quebrado.</p>
+          <p>Erros do teste HEAD são confirmados com GET. Só 404 ou 410 confirmados entram como links quebrados.</p>
         </article>
         <article className="page-panel">
           <span>04</span>
@@ -37,6 +37,7 @@ export function HelpView() {
           <li>O histórico permanece no navegador e ainda não possui conta ou banco de dados.</li>
           <li>Responsividade e regras completas do axe-core entrarão nas próximas versões.</li>
           <li>Sites que bloqueiam requisições automatizadas podem retornar resultados inconclusivos.</li>
+          <li>Respostas 401, 403 e 429 são inconclusivas e devem ser confirmadas manualmente.</li>
         </ul>
       </div>
     </section>

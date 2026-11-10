@@ -100,7 +100,7 @@ export const requestPinnedAddress: RawRequest = (target, options) =>
           : '*/*',
         'Accept-Encoding': 'gzip, deflate, br',
         Host: url.host,
-        'User-Agent': 'RastreiaWeb/0.1 (+https://github.com/vitorBud/RastreiaWeb)',
+        'User-Agent': 'Mozilla/5.0 (compatible; RastreiaWeb/0.1; +https://github.com/vitorBud/RastreiaWeb)',
       },
       hostname: address.address,
       method: options.method,
@@ -118,7 +118,11 @@ export const requestPinnedAddress: RawRequest = (target, options) =>
         options.method === 'HEAD' ||
         redirectStatusCodes.has(statusCode)
       ) {
-        response.resume();
+        if (!options.readBody && options.method === 'GET') {
+          response.destroy();
+        } else {
+          response.resume();
+        }
         resolve({ headers: response.headers, statusCode });
         return;
       }

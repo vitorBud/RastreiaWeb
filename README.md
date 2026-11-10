@@ -91,6 +91,12 @@ público aprovado para reduzir o risco de DNS rebinding. O HTML é interpretado
 com JavaScript e rede bloqueados. Nesta fase, são verificados no máximo 20 links
 e 20 recursos entre imagens, folhas de estilo e scripts.
 
+Links são consultados primeiro com `HEAD`. Qualquer resposta de erro é confirmada
+com um `GET` leve antes da classificação, reduzindo falsos positivos em servidores
+que não oferecem suporte adequado a `HEAD`. Respostas `401`, `403` e `429` são
+tratadas como inconclusivas, enquanto `404` e `410` confirmados por `GET` são
+classificados como links quebrados.
+
 ## Qualidade
 
 ```bash
@@ -110,8 +116,10 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 ## Interface atual
 
 - Visão geral com resumo da última auditoria.
+- Gráfico das últimas oito auditorias, dividido por categoria e com acesso ao relatório.
 - Formulário para nova auditoria.
 - Relatório com filtros de categoria e gravidade.
+- Distinção entre problemas confirmados, destinos indisponíveis e verificações inconclusivas.
 - Exportação do relatório em JSON e impressão.
 - Histórico local com seleção e exclusão de resultados.
 - Configurações de limites de links, recursos e histórico.

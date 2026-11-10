@@ -32,7 +32,10 @@ describe('runPageAudit', () => {
         linksChecked: 0,
         linksFound: 0,
         redirects: 0,
+        restrictedLinks: 0,
         resourcesChecked: 0,
+        unavailableLinks: 0,
+        unreachableLinks: 0,
         totalIssues: 0,
       },
     };

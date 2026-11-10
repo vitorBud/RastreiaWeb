@@ -33,8 +33,11 @@ function isAuditReport(value: unknown): value is AuditReport {
     'linksChecked',
     'linksFound',
     'redirects',
+    'restrictedLinks',
     'resourcesChecked',
     'totalIssues',
+    'unavailableLinks',
+    'unreachableLinks',
   ];
 
   return (

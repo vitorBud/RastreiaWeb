@@ -26,8 +26,11 @@ export interface AuditSummary {
   linksChecked: number;
   linksFound: number;
   redirects: number;
+  restrictedLinks: number;
   resourcesChecked: number;
   totalIssues: number;
+  unavailableLinks: number;
+  unreachableLinks: number;
 }
 
 export interface AuditReport {

@@ -38,25 +38,36 @@ interface PageAuditDependencies {
   requestUrl?: typeof requestPublicUrl;
 }
 
+type TargetState =
+  | 'broken'
+  | 'ok'
+  | 'restricted'
+  | 'unavailable'
+  | 'unreachable';
+
 interface TargetCheckResult {
-  failed: boolean;
   issues: AuditIssue[];
   redirected: boolean;
+  state: TargetState;
 }
 
 async function requestStatus(
   targetUrl: string,
   requestUrl: typeof requestPublicUrl,
 ): Promise<PublicHttpResponse> {
-  const headResponse = await requestUrl(targetUrl, {
-    maxRedirects: 3,
-    method: 'HEAD',
-    readBody: false,
-    timeoutMs: 5_000,
-  });
+  try {
+    const headResponse = await requestUrl(targetUrl, {
+      maxRedirects: 3,
+      method: 'HEAD',
+      readBody: false,
+      timeoutMs: 5_000,
+    });
 
-  if (headResponse.statusCode !== 405 && headResponse.statusCode !== 501) {
-    return headResponse;
+    if (headResponse.statusCode < 400) {
+      return headResponse;
+    }
+  } catch {
+    // Alguns servidores rejeitam HEAD. O GET abaixo confirma o estado real.
   }
 
   return requestUrl(targetUrl, {
@@ -78,10 +89,15 @@ function statusIssue(
     return null;
   }
 
-  const accessRestricted = statusCode === 401 || statusCode === 403;
+  const accessRestricted = statusCode === 401 || statusCode === 403 || statusCode === 429;
   const notFound = statusCode === 404 || statusCode === 410;
   const serverError = statusCode >= 500;
-  const severity: AuditSeverity = serverError || notFound ? 'serious' : 'moderate';
+  const severity: AuditSeverity = accessRestricted
+    ? 'minor'
+    : serverError || notFound
+      ? 'serious'
+      : 'moderate';
+  const subject = kind === 'link' ? 'link' : 'recurso';
 
   return {
     category: kind,
@@ -93,14 +109,18 @@ function statusIssue(
           ? 'SERVER_ERROR'
           : 'HTTP_ERROR',
     description: accessRestricted
-      ? `O destino respondeu com acesso restrito (${statusCode}); isso não significa necessariamente que esteja quebrado.`
-      : `O destino respondeu com o status HTTP ${statusCode}.`,
+      ? `Verificação inconclusiva: o destino restringiu a requisição automatizada com HTTP ${statusCode}.`
+      : notFound
+        ? `${subject === 'link' ? 'Link quebrado' : 'Recurso indisponível'} confirmado: o teste GET respondeu com HTTP ${statusCode}.`
+        : serverError
+          ? `O servidor do ${subject} falhou durante a confirmação GET com HTTP ${statusCode}.`
+          : `O ${subject} respondeu com HTTP ${statusCode} durante a confirmação GET.`,
     element,
     pageUrl,
     severity,
     statusCode,
     suggestion: accessRestricted
-      ? 'Confirme manualmente se o recurso exige autenticação ou bloqueia verificações automatizadas.'
+      ? 'Abra o destino manualmente. Ele pode exigir autenticação ou bloquear ferramentas automatizadas.'
       : 'Confira o endereço e corrija ou substitua a referência.',
     targetUrl,
   };
@@ -122,7 +142,7 @@ async function checkTarget(
       response.statusCode,
       kind,
     );
-    const accessRestricted = response.statusCode === 401 || response.statusCode === 403;
+    const accessRestricted = [401, 403, 429].includes(response.statusCode);
     const issues = issue ? [issue] : [];
 
     if (response.redirects.length > 0) {
@@ -139,18 +159,23 @@ async function checkTarget(
       });
     }
 
-    return {
-      failed: response.statusCode >= 400 && !accessRestricted,
-      issues,
-      redirected: response.redirects.length > 0,
-    };
+    let state: TargetState = 'ok';
+
+    if (accessRestricted) {
+      state = 'restricted';
+    } else if (response.statusCode === 404 || response.statusCode === 410) {
+      state = 'broken';
+    } else if (response.statusCode >= 400) {
+      state = 'unavailable';
+    }
+
+    return { issues, redirected: response.redirects.length > 0, state };
   } catch (error) {
     const description = error instanceof AuditNetworkError
       ? error.message
       : 'Não foi possível acessar o destino.';
 
     return {
-      failed: true,
       issues: [{
         category: kind,
         code: 'UNREACHABLE',
@@ -162,6 +187,7 @@ async function checkTarget(
         targetUrl,
       }],
       redirected: false,
+      state: 'unreachable',
     };
   }
 }
@@ -278,16 +304,21 @@ export async function auditPage(
     limits: { maxLinks, maxResources },
     pageTitle: inventory.title || new URL(pageResponse.finalUrl).hostname,
     summary: {
-      brokenLinks: linkResults.filter((result) => result.failed).length,
-      failedResources: resourceResults.filter((result) => result.failed).length,
+      brokenLinks: linkResults.filter((result) => result.state === 'broken').length,
+      failedResources: resourceResults.filter((result) =>
+        ['broken', 'unavailable', 'unreachable'].includes(result.state),
+      ).length,
       imagesFound: inventory.images.length,
       imagesWithoutAlt: inventory.images.filter((image) => image.alt === null).length,
       linksChecked: links.length,
       linksFound: inventory.links.length,
       redirects: [...linkResults, ...resourceResults]
         .filter((result) => result.redirected).length,
+      restrictedLinks: linkResults.filter((result) => result.state === 'restricted').length,
       resourcesChecked: resources.length,
       totalIssues: issues.length,
+      unavailableLinks: linkResults.filter((result) => result.state === 'unavailable').length,
+      unreachableLinks: linkResults.filter((result) => result.state === 'unreachable').length,
     },
   };
 }

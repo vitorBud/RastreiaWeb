@@ -13,7 +13,7 @@ const report = {
   issues: [{
     category: 'link',
     code: 'NOT_FOUND',
-    description: 'O destino respondeu com o status HTTP 404.',
+    description: 'Link quebrado confirmado: o teste GET respondeu com HTTP 404.',
     pageUrl: 'https://example.com/',
     severity: 'serious',
     statusCode: 404,
@@ -29,7 +29,10 @@ const report = {
     linksChecked: 1,
     linksFound: 1,
     redirects: 0,
+    restrictedLinks: 0,
     resourcesChecked: 0,
+    unavailableLinks: 0,
+    unreachableLinks: 0,
     totalIssues: 1,
   },
 };
@@ -56,7 +59,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Analisar página' }));
 
     expect(await screen.findByText('Example Domain')).toBeInTheDocument();
-    expect(screen.getByText('O destino respondeu com o status HTTP 404.')).toBeInTheDocument();
+    expect(screen.getByText('Link quebrado confirmado: o teste GET respondeu com HTTP 404.')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/audits', expect.objectContaining({
       method: 'POST',
     }));

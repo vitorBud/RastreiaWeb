@@ -76,4 +76,79 @@ describe('auditPage', () => {
       requestUrl,
     })).rejects.toMatchObject({ code: 'PAGE_NOT_HTML' });
   });
+
+  it('não marca como quebrado quando HEAD falha mas GET confirma o link', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { method?: 'GET' | 'HEAD'; readBody?: boolean },
+    ): Promise<PublicHttpResponse> => {
+      if (options?.readBody) {
+        return pageResponse;
+      }
+
+      return {
+        ...pageResponse,
+        body: undefined,
+        finalUrl: url,
+        statusCode: options?.method === 'HEAD' ? 404 : 200,
+      };
+    });
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [{
+        element: '<a href="/pagina">Página</a>',
+        targetUrl: 'https://example.com/pagina',
+        text: 'Página',
+      }],
+      resources: [],
+      title: 'Exemplo',
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.summary.brokenLinks).toBe(0);
+    expect(report.issues).toHaveLength(0);
+    expect(requestUrl).toHaveBeenCalledTimes(3);
+  });
+
+  it('trata bloqueio automatizado como inconclusivo, não como link quebrado', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { readBody?: boolean },
+    ): Promise<PublicHttpResponse> => options?.readBody
+      ? pageResponse
+      : {
+          ...pageResponse,
+          body: undefined,
+          finalUrl: url,
+          statusCode: 403,
+        });
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [{
+        element: '<a href="/restrito">Área restrita</a>',
+        targetUrl: 'https://example.com/restrito',
+        text: 'Área restrita',
+      }],
+      resources: [],
+      title: 'Exemplo',
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.summary.brokenLinks).toBe(0);
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        code: 'ACCESS_RESTRICTED',
+        severity: 'minor',
+        statusCode: 403,
+      }),
+    ]);
+  });
 });

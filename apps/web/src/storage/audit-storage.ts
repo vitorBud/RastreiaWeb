@@ -27,6 +27,18 @@ function isStoredReport(item: unknown): item is AuditReport {
   );
 }
 
+function normalizeStoredReport(report: AuditReport): AuditReport {
+  return {
+    ...report,
+    summary: {
+      ...report.summary,
+      restrictedLinks: report.summary.restrictedLinks ?? 0,
+      unavailableLinks: report.summary.unavailableLinks ?? 0,
+      unreachableLinks: report.summary.unreachableLinks ?? 0,
+    },
+  };
+}
+
 export function loadAuditHistory(): AuditReport[] {
   try {
     const value = getStorage()?.getItem(historyKey);
@@ -36,7 +48,7 @@ export function loadAuditHistory(): AuditReport[] {
       return [];
     }
 
-    return parsed.filter(isStoredReport);
+    return parsed.filter(isStoredReport).map(normalizeStoredReport);
   } catch {
     return [];
   }
