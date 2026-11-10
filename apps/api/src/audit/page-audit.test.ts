@@ -156,6 +156,13 @@ describe('auditPage', () => {
       linksChecked: 1,
       linksFound: 2,
     });
+    expect(report.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: 'link',
+        code: 'INVALID_LINK_TARGET',
+        targetUrl: 'http://[',
+      }),
+    ]));
     expect(report.links).toEqual([
       expect.objectContaining({
         declaredHref: '/documentacao#inicio',

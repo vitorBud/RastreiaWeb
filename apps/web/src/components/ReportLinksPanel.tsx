@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AuditLinkResult, AuditLinkState } from '../types/audit';
 import { Icon } from './Icon';
 
@@ -8,6 +8,7 @@ interface ReportLinksPanelProps {
 }
 
 type LinkOrder = 'document' | 'result' | 'status' | 'text';
+type LinkScope = 'external' | 'internal' | 'invalid';
 
 const stateLabels: Record<AuditLinkState, string> = {
   broken: 'Quebrado',
@@ -38,6 +39,31 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function isReportableLink(link: AuditLinkResult): boolean {
+  const declaredHref = link.declaredHref.trim();
+
+  if (
+    !declaredHref ||
+    declaredHref.startsWith('#') ||
+    /^(?:\.{0,2}\/|\/)?@[a-z][\w.-]*$/i.test(declaredHref) ||
+    /^(?:undefined|null|false|\[object Object\])$/i.test(declaredHref) ||
+    /\{\{.*\}\}|\$\{.*\}|\[\[.*\]\]|<%.*%>/.test(declaredHref) ||
+    /^(?:javascript|data|mailto|tel|sms|blob|about):/i.test(declaredHref)
+  ) {
+    return false;
+  }
+
+  try {
+    const target = new URL(link.targetUrl);
+    const page = new URL(link.pageUrl);
+    target.hash = '';
+    page.hash = '';
+    return target.toString() !== page.toString();
+  } catch {
+    return true;
+  }
+}
+
 function destinationKey(link: AuditLinkResult): string {
   try {
     const url = new URL(link.targetUrl);
@@ -47,6 +73,23 @@ function destinationKey(link: AuditLinkResult): string {
     return link.targetUrl;
   }
 }
+
+function linkScope(link: AuditLinkResult): LinkScope {
+  try {
+    const target = new URL(link.targetUrl);
+    const page = new URL(link.pageUrl);
+
+    return target.hostname === page.hostname ? 'internal' : 'external';
+  } catch {
+    return 'invalid';
+  }
+}
+
+const scopeLabels: Record<LinkScope, string> = {
+  external: 'Domínio externo',
+  internal: 'Mesmo domínio',
+  invalid: 'Destino inválido',
+};
 
 function notCheckedExplanation(link: AuditLinkResult): string {
   if (link.checkReason === 'invalid_url') {
@@ -66,11 +109,15 @@ export function ReportLinksPanel({
 }: ReportLinksPanelProps) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState<'all' | AuditLinkState>('all');
+  const [scope, setScope] = useState<'all' | Exclude<LinkScope, 'invalid'>>('all');
   const [order, setOrder] = useState<LinkOrder>('document');
+  const [visibleCount, setVisibleCount] = useState(20);
+  const reportableLinks = useMemo(() => links.filter(isReportableLink), [links]);
   const filteredLinks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const result = links.filter((link) =>
+    const result = reportableLinks.filter((link) =>
       (state === 'all' || link.state === state) &&
+      (scope === 'all' || linkScope(link) === scope) &&
       (!normalizedQuery || [
         link.declaredHref,
         link.element,
@@ -99,23 +146,29 @@ export function ReportLinksPanel({
           return first.position - second.position;
       }
     });
-  }, [links, order, query, state]);
-  const checkableLinks = links.filter((link) => isHttpUrl(link.targetUrl));
+  }, [order, query, reportableLinks, scope, state]);
+  const visibleLinks = filteredLinks.slice(0, visibleCount);
+  const checkableLinks = reportableLinks.filter((link) => isHttpUrl(link.targetUrl));
   const uniqueDestinations = new Set(checkableLinks.map(destinationKey)).size;
   const checkedDestinations = new Set(
     checkableLinks
       .filter((link) => link.state !== 'not_checked')
       .map(destinationKey),
   ).size;
-  const notCheckedCount = links.filter((link) => link.state === 'not_checked').length;
+  const notCheckedCount = reportableLinks.filter((link) => link.state === 'not_checked').length;
+
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [order, query, scope, state]);
 
   function clearFilters() {
     setQuery('');
     setState('all');
+    setScope('all');
     setOrder('document');
   }
 
-  if (links.length === 0) {
+  if (reportableLinks.length === 0) {
     return (
       <section className="links-empty page-panel">
         <Icon name="link" />
@@ -136,7 +189,7 @@ export function ReportLinksPanel({
   return (
     <section className="links-inventory" aria-labelledby="links-inventory-title">
       <div className="link-inventory-summary">
-        <article><small>Elementos no HTML</small><strong>{links.length}</strong><span>Inclui repetições</span></article>
+        <article><small>Links navegáveis no HTML</small><strong>{reportableLinks.length}</strong><span>Inclui repetições</span></article>
         <article><small>Destinos HTTP únicos</small><strong>{uniqueDestinations}</strong><span>Sem contar fragmentos</span></article>
         <article><small>Destinos verificados</small><strong>{checkedDestinations}</strong><span>Com resultado de rede</span></article>
         <article className="not-checked-summary"><small>Elementos não verificados</small><strong>{notCheckedCount}</strong><span>Limite, protocolo ou URL inválida</span></article>
@@ -146,7 +199,7 @@ export function ReportLinksPanel({
         <div>
           <span className="card-eyebrow">Inventário da página</span>
           <h2 id="links-inventory-title">Todos os links encontrados</h2>
-          <p>Ordenados pela posição no HTML. Links repetidos permanecem visíveis.</p>
+          <p>Somente destinos navegáveis. Placeholders, fragmentos locais e ações JavaScript são ignorados.</p>
         </div>
         <div className="links-controls">
           <label>
@@ -173,6 +226,20 @@ export function ReportLinksPanel({
             </select>
           </label>
           <label>
+            Domínio
+            <select
+              aria-label="Filtrar links por domínio"
+              value={scope}
+              onChange={(event) => setScope(
+                event.target.value as 'all' | Exclude<LinkScope, 'invalid'>,
+              )}
+            >
+              <option value="all">Todos os domínios</option>
+              <option value="internal">Mesmo domínio</option>
+              <option value="external">Somente externos</option>
+            </select>
+          </label>
+          <label>
             Ordenar
             <select
               aria-label="Ordenar links"
@@ -193,7 +260,7 @@ export function ReportLinksPanel({
 
       <div className="links-results page-panel">
         <div className="links-results-heading" aria-atomic="true" aria-live="polite">
-          <strong>{filteredLinks.length} de {links.length} link(s)</strong>
+          <strong>{filteredLinks.length} de {reportableLinks.length} link(s)</strong>
           <span>Cada número corresponde à posição do elemento no HTML.</span>
         </div>
 
@@ -205,7 +272,7 @@ export function ReportLinksPanel({
           </div>
         ) : (
           <ol className="audited-link-list">
-            {filteredLinks.map((link) => (
+            {visibleLinks.map((link) => (
               <li className={`audited-link-card ${link.state}`} key={`${link.position}-${link.declaredHref}`}>
                 <span className="link-position" aria-hidden="true">
                   {String(link.position).padStart(2, '0')}
@@ -217,6 +284,9 @@ export function ReportLinksPanel({
                       <h3>{link.text || 'Link sem texto visível'}</h3>
                     </div>
                     <div className="link-result-badges">
+                      <span className={`link-scope-badge ${linkScope(link)}`}>
+                        {scopeLabels[linkScope(link)]}
+                      </span>
                       <span className={`link-state-badge ${link.state}`}>
                         {stateLabels[link.state]}
                       </span>
@@ -282,6 +352,16 @@ export function ReportLinksPanel({
               </li>
             ))}
           </ol>
+        )}
+        {visibleCount < filteredLinks.length && (
+          <button
+            className="secondary-button load-more-button"
+            type="button"
+            onClick={() => setVisibleCount((count) => count + 20)}
+          >
+            Mostrar mais links
+            <span>{filteredLinks.length - visibleCount} restantes</span>
+          </button>
         )}
       </div>
     </section>

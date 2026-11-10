@@ -201,46 +201,48 @@ export function App() {
           </div>
         </header>
 
-        {view === 'dashboard' && (
-          <DashboardView
-            auditError={auditError}
-            history={history}
-            isAuditing={isAuditing}
-            onAudit={handleAudit}
-            onNavigate={navigate}
-            onOpenReport={openReport}
-            onResetError={() => setAuditError('')}
-            onSelectReport={selectReport}
-            report={currentReport}
-          />
-        )}
-        {view === 'new-audit' && (
-          <NewAuditView
-            error={auditError}
-            isAuditing={isAuditing}
-            onAudit={handleAudit}
-            onResetError={() => setAuditError('')}
-          />
-        )}
-        {view === 'reports' && (
-          <ReportView
-            initialFocus={reportFocus}
-            key={reportNavigationId}
-            onNavigate={navigate}
-            report={currentReport}
-          />
-        )}
-        {view === 'history' && (
-          <HistoryView
-            history={history}
-            onClear={clearHistory}
-            onDelete={deleteReport}
-            onNavigate={navigate}
-            onSelect={selectReport}
-          />
-        )}
-        {view === 'settings' && <SettingsView onSave={handleSaveSettings} settings={settings} />}
-        {view === 'help' && <HelpView />}
+        <div className={`view-content view-${view}`} key={view}>
+          {view === 'dashboard' && (
+            <DashboardView
+              auditError={auditError}
+              history={history}
+              isAuditing={isAuditing}
+              onAudit={handleAudit}
+              onNavigate={navigate}
+              onOpenReport={openReport}
+              onResetError={() => setAuditError('')}
+              onSelectReport={selectReport}
+              report={currentReport}
+            />
+          )}
+          {view === 'new-audit' && (
+            <NewAuditView
+              error={auditError}
+              isAuditing={isAuditing}
+              onAudit={handleAudit}
+              onResetError={() => setAuditError('')}
+            />
+          )}
+          {view === 'reports' && (
+            <ReportView
+              initialFocus={reportFocus}
+              key={reportNavigationId}
+              onNavigate={navigate}
+              report={currentReport}
+            />
+          )}
+          {view === 'history' && (
+            <HistoryView
+              history={history}
+              onClear={clearHistory}
+              onDelete={deleteReport}
+              onNavigate={navigate}
+              onSelect={selectReport}
+            />
+          )}
+          {view === 'settings' && <SettingsView onSave={handleSaveSettings} settings={settings} />}
+          {view === 'help' && <HelpView />}
+        </div>
 
         <footer className="dashboard-footer">
           <span>RastreiaWeb v0.1</span>

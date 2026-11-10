@@ -127,6 +127,7 @@ describe('ReportView', () => {
     expect(screen.getByText('Quebrados confirmados')).toBeInTheDocument();
     expect(screen.getByText('Inconclusivos')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar filtros' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Resultado' }), {
       target: { value: 'inconclusive' },
     });
@@ -138,6 +139,7 @@ describe('ReportView', () => {
   it('mostra exatamente qual imagem está sem alt e onde ela foi encontrada', () => {
     render(<ReportView onNavigate={vi.fn()} report={report} />);
 
+    fireEvent.click(screen.getByText('banner-home.jpg'));
     const details = screen.getByRole('region', {
       name: 'Detalhes da imagem sem alt: banner-home.jpg',
     });
@@ -162,6 +164,7 @@ describe('ReportView', () => {
   it('permite localizar a ocorrência pela página de origem', () => {
     render(<ReportView onNavigate={vi.fn()} report={report} />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar filtros' }));
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar' }), {
       target: { value: '/produtos' },
     });
@@ -207,7 +210,7 @@ describe('ReportView', () => {
     expect(screen.getByText('Documentação antiga')).toBeInTheDocument();
     expect(screen.getByText('Página ausente')).toBeInTheDocument();
     expect(screen.getByText('Área restrita')).toBeInTheDocument();
-    expect(screen.getByText('E-mail')).toBeInTheDocument();
+    expect(screen.queryByText('E-mail')).not.toBeInTheDocument();
     expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
   });
 

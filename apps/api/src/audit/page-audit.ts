@@ -314,18 +314,32 @@ export async function auditPage(
       .map((image) => ({ ...image, kind: 'image' as const })),
     ...inventory.resources,
   ].slice(0, maxResources);
-  const issues: AuditIssue[] = inventory.images
-    .filter((image) => image.alt === null)
-    .map((image) => ({
-      category: 'accessibility',
-      code: 'IMAGE_ALT_MISSING',
-      description: `A imagem "${readableFileName(image.targetUrl)}" foi encontrada sem o atributo alt.`,
-      element: image.element,
-      pageUrl: pageResponse.finalUrl,
-      severity: 'serious',
-      suggestion: 'Se a imagem comunica conteúdo ou funciona como controle, adicione um alt que descreva objetivamente sua informação ou função. Se for apenas decorativa, mantenha o atributo presente e vazio (alt=""). Não use somente o nome do arquivo como texto alternativo.',
-      targetUrl: image.targetUrl,
-    }));
+  const issues: AuditIssue[] = [
+    ...inventory.images
+      .filter((image) => image.alt === null)
+      .map((image) => ({
+        category: 'accessibility' as const,
+        code: 'IMAGE_ALT_MISSING',
+        description: `A imagem "${readableFileName(image.targetUrl)}" foi encontrada sem o atributo alt.`,
+        element: image.element,
+        pageUrl: pageResponse.finalUrl,
+        severity: 'serious' as const,
+        suggestion: 'Se a imagem comunica conteúdo ou funciona como controle, adicione um alt que descreva objetivamente sua informação ou função. Se for apenas decorativa, mantenha o atributo presente e vazio (alt=""). Não use somente o nome do arquivo como texto alternativo.',
+        targetUrl: image.targetUrl,
+      })),
+    ...inventory.links
+      .filter((link) => link.uncheckableReason === 'invalid_url')
+      .map((link) => ({
+        category: 'link' as const,
+        code: 'INVALID_LINK_TARGET',
+        description: `O atributo href contém um destino inválido: "${link.declaredHref}".`,
+        element: link.element,
+        pageUrl: pageResponse.finalUrl,
+        severity: 'moderate' as const,
+        suggestion: 'Substitua o href por uma URL HTTP(S), um caminho relativo válido ou remova o elemento da navegação.',
+        targetUrl: link.targetUrl,
+      })),
+  ];
 
   const linkResults = await mapWithConcurrency(linksToCheck, 4, (link) =>
     checkTarget(

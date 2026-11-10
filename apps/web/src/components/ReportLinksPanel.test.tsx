@@ -92,7 +92,6 @@ describe('ReportLinksPanel', () => {
       'Servidor indisponível',
       'Destino inacessível',
       'Fora do limite',
-      'E-mail',
       'URL inválida',
       'Início no rodapé',
     ]);
@@ -148,12 +147,69 @@ describe('ReportLinksPanel', () => {
       .toHaveAttribute('href', 'https://example.com/documentacao');
     expect(screen.getByText(/ficou fora da verificação HTTP por causa do limite/))
       .toBeInTheDocument();
-    expect(screen.getByText(/não usa HTTP ou HTTPS/)).toBeInTheDocument();
     expect(screen.getByText(/não pôde ser interpretado como uma URL válida/))
       .toBeInTheDocument();
     expect(screen.getByText('Ver elemento HTML e rota de redirecionamento'))
       .toBeInTheDocument();
     expect(screen.getAllByText('Ver elemento HTML').length).toBeGreaterThan(0);
+  });
+
+  it('monta listas extensas em etapas para manter a troca de seção responsiva', () => {
+    const manyLinks = Array.from({ length: 25 }, (_, index) =>
+      createLink(index + 1, 'ok'),
+    );
+
+    render(<ReportLinksPanel discoveredDestinations={25} links={manyLinks} />);
+
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(20);
+    fireEvent.click(screen.getByRole('button', { name: /Mostrar mais links/ }));
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(25);
+  });
+
+  it('permite separar links do mesmo domínio de destinos externos', () => {
+    const externalLink = createLink(2, 'ok', {
+      declaredHref: 'https://docs.example.net/guia',
+      finalUrl: 'https://docs.example.net/guia',
+      targetUrl: 'https://docs.example.net/guia',
+      text: 'Documentação externa',
+    });
+
+    render(
+      <ReportLinksPanel
+        discoveredDestinations={2}
+        links={[createLink(1, 'ok', { text: 'Página interna' }), externalLink]}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('combobox', {
+      name: 'Filtrar links por domínio',
+    }), { target: { value: 'external' } });
+
+    expect(screen.getByRole('heading', { name: 'Documentação externa' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Página interna' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText('Domínio externo')).toBeInTheDocument();
+  });
+
+  it('remove placeholders de relatórios antigos já armazenados', () => {
+    const placeholder = createLink(2, 'ok', {
+      declaredHref: '@wrapper',
+      targetUrl: 'https://example.com/@wrapper',
+      text: 'Wrapper interno',
+    });
+
+    render(
+      <ReportLinksPanel
+        discoveredDestinations={2}
+        links={[createLink(1, 'ok', { text: 'Página válida' }), placeholder]}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Página válida' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wrapper interno' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText('1 de 1 link(s)')).toBeInTheDocument();
   });
 
   it('diferencia uma página sem links de um relatório antigo', () => {

@@ -90,41 +90,69 @@ export async function createDocumentInventory(
         }
       };
 
+      const isTemplatePlaceholder = (value: string) =>
+        /^(?:\.{0,2}\/|\/)?@[a-z][\w.-]*$/i.test(value) ||
+        /^(?:undefined|null|false|\[object Object\])$/i.test(value) ||
+        /\{\{.*\}\}|\$\{.*\}|\[\[.*\]\]|<%.*%>/.test(value);
+
       const toLinkTarget = (value: string | null) => {
         if (value === null) {
           return null;
         }
 
-        try {
-          const target = new URL(value, baseUrl);
-          const checkable = target.protocol === 'http:' || target.protocol === 'https:';
-          let checkUrl: string | undefined;
+        const declaredHref = value.trim();
 
-          if (checkable) {
-            const requestTarget = new URL(target);
-            requestTarget.hash = '';
-            checkUrl = requestTarget.toString();
+        if (
+          !declaredHref ||
+          declaredHref.startsWith('#') ||
+          isTemplatePlaceholder(declaredHref) ||
+          /^(?:javascript|data|mailto|tel|sms|blob|about):/i.test(declaredHref)
+        ) {
+          return null;
+        }
+
+        try {
+          const target = new URL(declaredHref, baseUrl);
+          const checkable = target.protocol === 'http:' || target.protocol === 'https:';
+
+          if (!checkable) {
+            return null;
+          }
+
+          const requestTarget = new URL(target);
+          const currentDocument = new URL(fallbackUrl);
+          requestTarget.hash = '';
+          currentDocument.hash = '';
+
+          if (requestTarget.toString() === currentDocument.toString()) {
+            return null;
           }
 
           return {
-            checkable,
-            checkUrl,
-            declaredHref: value,
+            checkable: true,
+            checkUrl: requestTarget.toString(),
+            declaredHref,
             targetUrl: target.toString(),
-            uncheckableReason: checkable ? undefined : 'unsupported_protocol' as const,
+            uncheckableReason: undefined,
           };
         } catch {
           return {
             checkable: false,
             checkUrl: undefined,
-            declaredHref: value,
-            targetUrl: value,
+            declaredHref,
+            targetUrl: declaredHref,
             uncheckableReason: 'invalid_url' as const,
           };
         }
       };
 
-      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+      const links = Array.from(
+        document.querySelectorAll<HTMLAnchorElement | HTMLAreaElement>('a[href], area[href]'),
+      )
+        .filter((element) =>
+          element.getAttribute('aria-disabled') !== 'true' &&
+          !element.hasAttribute('disabled'),
+        )
         .map((element) => {
           const target = toLinkTarget(element.getAttribute('href'));
 
@@ -132,7 +160,13 @@ export async function createDocumentInventory(
             ? {
                 ...target,
                 element: htmlPreview(element),
-                text: element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 160) ?? '',
+                text: (
+                  element.textContent ||
+                  element.getAttribute('aria-label') ||
+                  element.getAttribute('alt') ||
+                  element.getAttribute('title') ||
+                  ''
+                ).trim().replace(/\s+/g, ' ').slice(0, 160),
               }
             : null;
         })

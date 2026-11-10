@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { ReportLinksPanel } from '../components/ReportLinksPanel';
 import type {
@@ -82,6 +82,7 @@ function issueOutcome(issue: AuditIssue): IssueOutcome {
   switch (issue.code) {
     case 'NOT_FOUND':
     case 'IMAGE_ALT_MISSING':
+    case 'INVALID_LINK_TARGET':
       return 'confirmed';
     case 'ACCESS_RESTRICTED':
       return 'inconclusive';
@@ -109,19 +110,20 @@ function ImageAltDetails({ copiedUrl, issue, onCopyUrl }: ImageAltDetailsProps) 
   const externalResource = imageHost !== 'Não informado' && imageHost !== pageHost;
 
   return (
-    <section
-      className="image-alt-details"
-      aria-label={`Detalhes da imagem sem alt: ${imageName}`}
-    >
-      <div className="image-alt-heading">
-        <div>
+    <details className="image-alt-details">
+      <summary>
+        <span>
           <small>Imagem afetada</small>
           <strong>{imageName}</strong>
-        </div>
-        <span>atributo alt ausente</span>
-      </div>
+        </span>
+        <span>Ver detalhes</span>
+      </summary>
 
-      <dl className="image-alt-grid">
+      <section
+        className="image-alt-details-body"
+        aria-label={`Detalhes da imagem sem alt: ${imageName}`}
+      >
+        <dl className="image-alt-grid">
         <div className="image-alt-field wide">
           <dt>URL exata da imagem</dt>
           <dd className="image-alt-address">
@@ -177,15 +179,16 @@ function ImageAltDetails({ copiedUrl, issue, onCopyUrl }: ImageAltDetailsProps) 
           <dt>Estado encontrado</dt>
           <dd><code>alt</code> não está presente no elemento.</dd>
         </div>
-      </dl>
+        </dl>
 
-      {issue.element && (
-        <div className="image-alt-element">
-          <span>Elemento HTML encontrado</span>
-          <pre><code>{issue.element}</code></pre>
-        </div>
-      )}
-    </section>
+        {issue.element && (
+          <div className="image-alt-element">
+            <span>Elemento HTML encontrado</span>
+            <pre><code>{issue.element}</code></pre>
+          </div>
+        )}
+      </section>
+    </details>
   );
 }
 
@@ -219,6 +222,10 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
   const [section, setSection] = useState<'issues' | 'links'>(
     initialFocus.section ?? 'issues',
   );
+  const [visibleIssueCount, setVisibleIssueCount] = useState(15);
+  const [showFilters, setShowFilters] = useState(
+    Boolean(initialFocus.category || initialFocus.query),
+  );
   const filteredIssues = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -237,6 +244,15 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
       )
       .sort((first, second) => severityOrder[first.severity] - severityOrder[second.severity]) ?? [];
   }, [category, outcome, query, report, severity]);
+  const visibleIssues = filteredIssues.slice(0, visibleIssueCount);
+
+  useEffect(() => {
+    setVisibleIssueCount(15);
+  }, [category, outcome, query, severity]);
+
+  function changeSection(nextSection: 'issues' | 'links') {
+    setSection(nextSection);
+  }
 
   function clearFilters() {
     setCategory('all');
@@ -275,6 +291,12 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
   const inconclusiveCount = report.issues.filter(
     (issue) => issue.code === 'ACCESS_RESTRICTED',
   ).length;
+  const activeFilterCount = [
+    category !== 'all',
+    severity !== 'all',
+    outcome !== 'all',
+    Boolean(query.trim()),
+  ].filter(Boolean).length;
 
   return (
     <section className="report-view">
@@ -297,27 +319,40 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
             <Icon name="download" />Exportar JSON
           </button>
         </div>
-        <dl className="report-coverage">
-          <div><dt>Links no HTML</dt><dd>{report.links.length} elementos</dd></div>
-          <div><dt>Destinos verificados</dt><dd>{report.summary.linksChecked} de {report.summary.linksFound}</dd></div>
-          <div><dt>Recursos verificados</dt><dd>{report.summary.resourcesChecked}</dd></div>
-          <div><dt>Limite aplicado</dt><dd>{report.limits.maxLinks} destinos · {report.limits.maxResources} recursos</dd></div>
-        </dl>
       </div>
 
-      <div className="summary-cards report-summary-cards">
-        <article><small>Ocorrências</small><strong>{report.summary.totalIssues}</strong><span>Total automático</span></article>
-        <article><small>Quebrados confirmados</small><strong>{report.summary.brokenLinks}</strong><span>HTTP 404 ou 410 via GET</span></article>
-        <article><small>Inconclusivos</small><strong>{inconclusiveCount}</strong><span>Bloqueio ou autenticação</span></article>
-        <article><small>Imagens sem alt</small><strong>{report.summary.imagesWithoutAlt}</strong><span>{report.summary.imagesFound} encontradas</span></article>
-      </div>
+      <details className="report-overview-disclosure page-panel">
+        <summary>
+          <span>
+            <strong>Resumo da auditoria</strong>
+            <small>
+              {report.summary.totalIssues} ocorrências · {report.summary.brokenLinks} quebrados · {report.summary.imagesWithoutAlt} sem alt
+            </small>
+          </span>
+          <span>Ver resumo</span>
+        </summary>
+        <div className="report-overview-content">
+          <div className="summary-cards report-summary-cards">
+            <article><small>Ocorrências</small><strong>{report.summary.totalIssues}</strong><span>Total automático</span></article>
+            <article><small>Quebrados confirmados</small><strong>{report.summary.brokenLinks}</strong><span>HTTP 404 ou 410 via GET</span></article>
+            <article><small>Inconclusivos</small><strong>{inconclusiveCount}</strong><span>Bloqueio ou autenticação</span></article>
+            <article><small>Imagens sem alt</small><strong>{report.summary.imagesWithoutAlt}</strong><span>{report.summary.imagesFound} encontradas</span></article>
+          </div>
+          <dl className="report-coverage">
+            <div><dt>Links navegáveis</dt><dd>{report.links.length} elementos</dd></div>
+            <div><dt>Destinos verificados</dt><dd>{report.summary.linksChecked} de {report.summary.linksFound}</dd></div>
+            <div><dt>Recursos verificados</dt><dd>{report.summary.resourcesChecked}</dd></div>
+            <div><dt>Limite aplicado</dt><dd>{report.limits.maxLinks} destinos · {report.limits.maxResources} recursos</dd></div>
+          </dl>
+        </div>
+      </details>
 
       <nav className="report-sections page-panel" aria-label="Conteúdo do relatório">
         <button
           type="button"
           className={section === 'issues' ? 'active' : ''}
           aria-pressed={section === 'issues'}
-          onClick={() => setSection('issues')}
+          onClick={() => changeSection('issues')}
         >
           <span>Ocorrências</span>
           <strong>{report.issues.length}</strong>
@@ -326,108 +361,118 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
           type="button"
           className={section === 'links' ? 'active' : ''}
           aria-pressed={section === 'links'}
-          onClick={() => setSection('links')}
+          onClick={() => changeSection('links')}
         >
           <span>Todos os links</span>
           <strong>{report.links.length}</strong>
         </button>
       </nav>
 
+      <div
+        className={`report-section-content report-section-${section}`}
+        key={section}
+      >
       {section === 'issues' ? (
-        <>
-          <div className="severity-overview page-panel" aria-label="Ocorrências por gravidade">
-            {Object.entries(severityLabels).map(([value, label]) => (
-              <button
-                type="button"
-                key={value}
-                className={severity === value ? 'active' : ''}
-                aria-pressed={severity === value}
-                onClick={() => setSeverity(
-                  severity === value ? 'all' : value as AuditSeverity,
-                )}
-              >
-                <span className={`severity-dot ${value}`} />
-                <span>{label}</span>
-                <strong>{severityCounts[value as AuditSeverity]}</strong>
-              </button>
-            ))}
-          </div>
-
-          <div className="report-workspace">
-            <aside className="report-filters page-panel" aria-label="Filtros do relatório">
+          <div className="issues-panel page-panel">
+            <div className="issues-toolbar">
               <div>
-                <span className="card-eyebrow">Refinar resultados</span>
-                <h2>Filtros</h2>
+                <span className="card-eyebrow">Ocorrências técnicas</span>
+                <h2>{filteredIssues.length} de {report.issues.length} resultado(s)</h2>
               </div>
-              <label className="report-search">
-                Buscar
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="URL, código ou descrição"
-                />
-              </label>
-              <fieldset>
-                <legend>Categoria</legend>
-                <select
-                  aria-label="Categoria"
-                  value={category}
-                  onChange={(event) => setCategory(
-                    event.target.value as 'all' | AuditCategory,
-                  )}
-                >
-                  <option value="all">Todas</option>
-                  {Object.entries(categoryLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </fieldset>
-              <fieldset>
-                <legend>Resultado</legend>
-                <select
-                  aria-label="Resultado"
-                  value={outcome}
-                  onChange={(event) => setOutcome(
-                    event.target.value as 'all' | IssueOutcome,
-                  )}
-                >
-                  <option value="all">Todos</option>
-                  {Object.entries(outcomeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </fieldset>
-              <fieldset>
-                <legend>Gravidade</legend>
-                <select
-                  aria-label="Gravidade"
-                  value={severity}
-                  onChange={(event) => setSeverity(
-                    event.target.value as 'all' | AuditSeverity,
-                  )}
-                >
-                  <option value="all">Todas</option>
-                  {Object.entries(severityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </fieldset>
-              <button className="secondary-button" type="button" onClick={clearFilters}>
-                Limpar filtros
+              <button
+                className="secondary-button filter-toggle"
+                type="button"
+                aria-expanded={showFilters}
+                onClick={() => setShowFilters((visible) => !visible)}
+              >
+                {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+                {activeFilterCount > 0 && <span>{activeFilterCount}</span>}
               </button>
-            </aside>
+            </div>
 
-            <div className="issues-panel page-panel">
-              <div className="issues-toolbar">
-                <div>
-                  <span className="card-eyebrow">Ocorrências técnicas</span>
-                  <h2>{filteredIssues.length} de {report.issues.length} resultado(s)</h2>
+            {showFilters && (
+              <div className="report-filter-drawer">
+                <div className="severity-overview" aria-label="Ocorrências por gravidade">
+                  {Object.entries(severityLabels).map(([value, label]) => (
+                    <button
+                      type="button"
+                      key={value}
+                      className={severity === value ? 'active' : ''}
+                      aria-pressed={severity === value}
+                      onClick={() => setSeverity(
+                        severity === value ? 'all' : value as AuditSeverity,
+                      )}
+                    >
+                      <span className={`severity-dot ${value}`} />
+                      <span>{label}</span>
+                      <strong>{severityCounts[value as AuditSeverity]}</strong>
+                    </button>
+                  ))}
+                </div>
+                <div className="report-filters" aria-label="Filtros do relatório">
+                  <label className="report-search">
+                    Buscar
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="URL, código ou descrição"
+                    />
+                  </label>
+                  <fieldset>
+                    <legend>Categoria</legend>
+                    <select
+                      aria-label="Categoria"
+                      value={category}
+                      onChange={(event) => setCategory(
+                        event.target.value as 'all' | AuditCategory,
+                      )}
+                    >
+                      <option value="all">Todas</option>
+                      {Object.entries(categoryLabels).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                  <fieldset>
+                    <legend>Resultado</legend>
+                    <select
+                      aria-label="Resultado"
+                      value={outcome}
+                      onChange={(event) => setOutcome(
+                        event.target.value as 'all' | IssueOutcome,
+                      )}
+                    >
+                      <option value="all">Todos</option>
+                      {Object.entries(outcomeLabels).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                  <fieldset>
+                    <legend>Gravidade</legend>
+                    <select
+                      aria-label="Gravidade"
+                      value={severity}
+                      onChange={(event) => setSeverity(
+                        event.target.value as 'all' | AuditSeverity,
+                      )}
+                    >
+                      <option value="all">Todas</option>
+                      {Object.entries(severityLabels).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                  <button className="secondary-button" type="button" onClick={clearFilters}>
+                    Limpar filtros
+                  </button>
                 </div>
               </div>
+            )}
 
-              <div aria-live="polite">
-                {filteredIssues.length === 0 ? (
+            <div className="issues-results" aria-live="polite">
+              {filteredIssues.length === 0 ? (
                   <div className="no-issues">
                     <Icon name="shield" />
                     <strong>Nenhuma ocorrência para estes filtros</strong>
@@ -435,7 +480,7 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
                   </div>
                 ) : (
                   <ol className="issue-list refined">
-                    {filteredIssues.map((issue, index) => {
+                    {visibleIssues.map((issue, index) => {
                       const result = issueOutcome(issue);
                       const imageWithoutAlt = issue.code === 'IMAGE_ALT_MISSING';
                       return (
@@ -491,17 +536,26 @@ export function ReportView({ initialFocus = {}, onNavigate, report }: ReportView
                       );
                     })}
                   </ol>
-                )}
-              </div>
+              )}
+              {visibleIssueCount < filteredIssues.length && (
+                <button
+                  className="secondary-button load-more-button"
+                  type="button"
+                  onClick={() => setVisibleIssueCount((count) => count + 15)}
+                >
+                  Mostrar mais ocorrências
+                  <span>{filteredIssues.length - visibleIssueCount} restantes</span>
+                </button>
+              )}
             </div>
           </div>
-        </>
       ) : (
         <ReportLinksPanel
           discoveredDestinations={report.summary.linksFound}
           links={report.links}
         />
       )}
+      </div>
 
       <p className="report-disclaimer">{report.disclaimer}</p>
     </section>
