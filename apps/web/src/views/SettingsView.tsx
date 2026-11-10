@@ -30,7 +30,7 @@ export function SettingsView({ onSave, settings }: SettingsViewProps) {
         <fieldset>
           <legend>Limites de rede</legend>
           <label>
-            Links por auditoria
+            Destinos HTTP únicos por auditoria
             <input
               type="number"
               min="1"
@@ -38,7 +38,10 @@ export function SettingsView({ onSave, settings }: SettingsViewProps) {
               value={draft.maxLinks}
               onChange={(event) => setDraft({ ...draft, maxLinks: Number(event.target.value) })}
             />
-            <small>Máximo de links que receberão uma verificação HTTP.</small>
+            <small>
+              Máximo de destinos únicos que receberão uma verificação HTTP. Todos os
+              elementos de link encontrados continuam listados no relatório.
+            </small>
           </label>
           <label>
             Recursos por auditoria

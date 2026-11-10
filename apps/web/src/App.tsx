@@ -8,7 +8,12 @@ import {
   saveAuditHistory,
   saveAuditSettings,
 } from './storage/audit-storage';
-import type { AppView, AuditReport, AuditSettings } from './types/audit';
+import type {
+  AppView,
+  AuditReport,
+  AuditSettings,
+  ReportFocus,
+} from './types/audit';
 import { DashboardView } from './views/DashboardView';
 import { HelpView } from './views/HelpView';
 import { HistoryView } from './views/HistoryView';
@@ -38,7 +43,7 @@ const viewContent: Record<AppView, { eyebrow: string; title: string; description
     title: 'Nova auditoria',
   },
   reports: {
-    description: 'Filtre ocorrências e encontre orientações para correção.',
+    description: 'Filtre ocorrências e consulte todos os links encontrados na página.',
     eyebrow: 'Diagnóstico técnico',
     title: 'Relatório',
   },
@@ -70,9 +75,24 @@ export function App() {
   const [settings, setSettings] = useState<AuditSettings>(loadAuditSettings);
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditError, setAuditError] = useState('');
+  const [reportFocus, setReportFocus] = useState<ReportFocus>({});
+  const [reportNavigationId, setReportNavigationId] = useState(0);
   const content = viewContent[view];
 
+  function openReport(focus: ReportFocus = {}) {
+    setReportFocus(focus);
+    setReportNavigationId((value) => value + 1);
+    setAuditError('');
+    setView('reports');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function navigate(nextView: AppView) {
+    if (nextView === 'reports') {
+      openReport();
+      return;
+    }
+
     setAuditError('');
     setView(nextView);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -92,7 +112,12 @@ export function App() {
       setCurrentReport(report);
       setHistory(nextHistory);
       saveAuditHistory(nextHistory);
-      setView(settings.autoOpenReport ? 'reports' : 'dashboard');
+
+      if (settings.autoOpenReport) {
+        openReport();
+      } else {
+        setView('dashboard');
+      }
     } catch (error) {
       setAuditError(
         error instanceof AuditApiError
@@ -106,7 +131,7 @@ export function App() {
 
   function selectReport(report: AuditReport) {
     setCurrentReport(report);
-    navigate('reports');
+    openReport();
   }
 
   function deleteReport(analyzedAt: string) {
@@ -155,7 +180,7 @@ export function App() {
             <button
               className="icon-button notification-button"
               type="button"
-              onClick={() => navigate('reports')}
+              onClick={() => openReport()}
               aria-label="Abrir relatório mais recente"
             >
               <Icon name="bell" />
@@ -183,6 +208,7 @@ export function App() {
             isAuditing={isAuditing}
             onAudit={handleAudit}
             onNavigate={navigate}
+            onOpenReport={openReport}
             onResetError={() => setAuditError('')}
             onSelectReport={selectReport}
             report={currentReport}
@@ -196,7 +222,14 @@ export function App() {
             onResetError={() => setAuditError('')}
           />
         )}
-        {view === 'reports' && <ReportView onNavigate={navigate} report={currentReport} />}
+        {view === 'reports' && (
+          <ReportView
+            initialFocus={reportFocus}
+            key={reportNavigationId}
+            onNavigate={navigate}
+            report={currentReport}
+          />
+        )}
         {view === 'history' && (
           <HistoryView
             history={history}

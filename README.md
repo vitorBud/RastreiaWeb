@@ -2,7 +2,7 @@
 
 O RastreiaWeb é uma plataforma open source para auditoria e diagnóstico de websites. O projeto ajudará desenvolvedores a localizar problemas técnicos, compreender sua gravidade e encontrar caminhos de correção.
 
-> O projeto está na fase de fundação. A auditoria de páginas ainda não foi implementada.
+> O projeto já possui a primeira auditoria funcional de uma página e segue em evolução até uma versão demonstrável completa.
 
 ## Objetivos do MVP
 
@@ -88,8 +88,11 @@ Content-Type: application/json
 
 A auditoria acessa uma única página, revalida redirecionamentos e conecta ao IP
 público aprovado para reduzir o risco de DNS rebinding. O HTML é interpretado
-com JavaScript e rede bloqueados. Nesta fase, são verificados no máximo 20 links
-e 20 recursos entre imagens, folhas de estilo e scripts.
+com JavaScript e rede bloqueados. Todos os elementos `<a href>` encontrados
+nesse HTML são preservados no relatório, inclusive links repetidos e protocolos
+como `mailto:` e `tel:`. Nesta fase, são verificados no máximo 20 destinos
+HTTP(S) únicos e 20 recursos entre imagens, folhas de estilo e scripts. Elementos
+que ultrapassam o limite continuam visíveis como “não verificados”.
 
 Links são consultados primeiro com `HEAD`. Qualquer resposta de erro é confirmada
 com um `GET` leve antes da classificação, reduzindo falsos positivos em servidores
@@ -113,6 +116,7 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 ## Limitações atuais
 
 - Apenas uma página é analisada por vez; não existe crawler de múltiplas páginas.
+- O inventário representa o HTML estático recebido; links inseridos posteriormente por JavaScript ainda não aparecem.
 - O histórico é armazenado localmente no navegador e ainda não possui sincronização.
 - A verificação de responsividade e a integração completa com axe-core ainda não foram implementadas.
 - Alguns sites podem restringir requisições automatizadas e produzir resultados inconclusivos.
@@ -121,10 +125,11 @@ O comando executa lint, verificação de tipos, testes e build de todos os works
 
 ## Interface atual
 
-- Visão geral com resumo da última auditoria.
+- Visão geral com resumo da última auditoria e lista completa das imagens sem `alt`.
 - Gráfico das últimas oito auditorias, dividido por categoria e com acesso ao relatório.
 - Formulário para nova auditoria.
-- Relatório com filtros de categoria e gravidade.
+- Relatório organizado entre “Ocorrências” e “Todos os links”.
+- Inventário de links em ordem de aparição, com busca, filtro por resultado, ordenação, status HTTP, destino final e evidência HTML.
 - Detalhamento de imagens sem `alt`, incluindo arquivo, domínio, página e elemento HTML.
 - Distinção entre problemas confirmados, destinos indisponíveis e verificações inconclusivas.
 - Exportação do relatório em JSON e impressão.

@@ -39,6 +39,9 @@ describe('auditPage', () => {
         targetUrl: 'https://example.com/logo.png',
       }],
       links: [{
+        checkable: true,
+        checkUrl: 'https://example.com/inexistente',
+        declaredHref: '/inexistente',
         element: '<a href="/inexistente">Link</a>',
         targetUrl: 'https://example.com/inexistente',
         text: 'Link',
@@ -73,6 +76,123 @@ describe('auditPage', () => {
       }),
       expect.objectContaining({ code: 'NOT_FOUND', statusCode: 404 }),
     ]));
+    expect(report.links).toEqual([
+      expect.objectContaining({
+        declaredHref: '/inexistente',
+        pageUrl: 'https://example.com/',
+        position: 1,
+        state: 'broken',
+        statusCode: 404,
+        targetUrl: 'https://example.com/inexistente',
+        text: 'Link',
+      }),
+    ]);
+  });
+
+  it('lista todos os links e verifica cada destino HTTP apenas uma vez', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { readBody?: boolean },
+    ): Promise<PublicHttpResponse> => options?.readBody
+      ? pageResponse
+      : {
+          ...pageResponse,
+          body: undefined,
+          finalUrl: url,
+        });
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [
+        {
+          checkable: true,
+          checkUrl: 'https://example.com/documentacao',
+          declaredHref: '/documentacao#inicio',
+          element: '<a href="/documentacao#inicio">Documentação</a>',
+          targetUrl: 'https://example.com/documentacao#inicio',
+          text: 'Documentação',
+        },
+        {
+          checkable: true,
+          checkUrl: 'https://example.com/documentacao',
+          declaredHref: '/documentacao#rodape',
+          element: '<a href="/documentacao#rodape">Documentação no rodapé</a>',
+          targetUrl: 'https://example.com/documentacao#rodape',
+          text: 'Documentação no rodapé',
+        },
+        {
+          checkable: true,
+          checkUrl: 'https://example.com/contato',
+          declaredHref: '/contato',
+          element: '<a href="/contato">Contato</a>',
+          targetUrl: 'https://example.com/contato',
+          text: 'Contato',
+        },
+        {
+          checkable: false,
+          declaredHref: 'mailto:contato@example.com',
+          element: '<a href="mailto:contato@example.com">E-mail</a>',
+          targetUrl: 'mailto:contato@example.com',
+          text: 'E-mail',
+        },
+        {
+          checkable: false,
+          declaredHref: 'http://[',
+          element: '<a href="http://[">URL inválida</a>',
+          targetUrl: 'http://[',
+          text: 'URL inválida',
+          uncheckableReason: 'invalid_url' as const,
+        },
+      ],
+      resources: [],
+      title: 'Exemplo',
+    }));
+
+    const report = await auditPage('https://example.com', { maxLinks: 1 }, {
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.summary).toMatchObject({
+      linksChecked: 1,
+      linksFound: 2,
+    });
+    expect(report.links).toEqual([
+      expect.objectContaining({
+        declaredHref: '/documentacao#inicio',
+        position: 1,
+        state: 'ok',
+        statusCode: 200,
+        targetUrl: 'https://example.com/documentacao#inicio',
+      }),
+      expect.objectContaining({
+        declaredHref: '/documentacao#rodape',
+        position: 2,
+        state: 'ok',
+        statusCode: 200,
+        targetUrl: 'https://example.com/documentacao#rodape',
+      }),
+      expect.objectContaining({
+        checkReason: 'limit',
+        position: 3,
+        state: 'not_checked',
+      }),
+      expect.objectContaining({
+        checkReason: 'unsupported_protocol',
+        position: 4,
+        state: 'not_checked',
+      }),
+      expect.objectContaining({
+        checkReason: 'invalid_url',
+        position: 5,
+        state: 'not_checked',
+      }),
+    ]);
+    expect(requestUrl).toHaveBeenCalledTimes(2);
+    expect(requestUrl).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/documentacao',
+      expect.objectContaining({ method: 'HEAD' }),
+    );
   });
 
   it('audita cada uso da imagem sem repetir sua verificação HTTP', async () => {
@@ -161,6 +281,9 @@ describe('auditPage', () => {
     const createInventory = vi.fn(async () => ({
       images: [],
       links: [{
+        checkable: true,
+        checkUrl: 'https://example.com/pagina',
+        declaredHref: '/pagina',
         element: '<a href="/pagina">Página</a>',
         targetUrl: 'https://example.com/pagina',
         text: 'Página',
@@ -194,6 +317,9 @@ describe('auditPage', () => {
     const createInventory = vi.fn(async () => ({
       images: [],
       links: [{
+        checkable: true,
+        checkUrl: 'https://example.com/restrito',
+        declaredHref: '/restrito',
         element: '<a href="/restrito">Área restrita</a>',
         targetUrl: 'https://example.com/restrito',
         text: 'Área restrita',
@@ -208,6 +334,10 @@ describe('auditPage', () => {
     });
 
     expect(report.summary.brokenLinks).toBe(0);
+    expect(report.links[0]).toMatchObject({
+      state: 'restricted',
+      statusCode: 403,
+    });
     expect(report.issues).toEqual([
       expect.objectContaining({
         code: 'ACCESS_RESTRICTED',
@@ -215,5 +345,72 @@ describe('auditPage', () => {
         statusCode: 403,
       }),
     ]);
+  });
+
+  it('registra redirecionamentos e destinos inacessíveis no inventário', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { readBody?: boolean },
+    ): Promise<PublicHttpResponse> => {
+      if (options?.readBody) {
+        return pageResponse;
+      }
+
+      if (url.endsWith('/antiga')) {
+        return {
+          ...pageResponse,
+          body: undefined,
+          finalUrl: 'https://example.com/nova',
+          redirects: ['https://example.com/nova'],
+        };
+      }
+
+      throw new Error('Destino inacessível');
+    });
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [
+        {
+          checkable: true,
+          checkUrl: 'https://example.com/antiga',
+          declaredHref: '/antiga',
+          element: '<a href="/antiga">Página antiga</a>',
+          targetUrl: 'https://example.com/antiga',
+          text: 'Página antiga',
+        },
+        {
+          checkable: true,
+          checkUrl: 'https://example.com/fora-do-ar',
+          declaredHref: '/fora-do-ar',
+          element: '<a href="/fora-do-ar">Fora do ar</a>',
+          targetUrl: 'https://example.com/fora-do-ar',
+          text: 'Fora do ar',
+        },
+      ],
+      resources: [],
+      title: 'Exemplo',
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      createInventory,
+      requestUrl,
+    });
+
+    expect(report.links[0]).toMatchObject({
+      finalUrl: 'https://example.com/nova',
+      redirects: ['https://example.com/nova'],
+      state: 'redirected',
+      statusCode: 200,
+    });
+    expect(report.links[1]).toMatchObject({
+      redirects: [],
+      state: 'unreachable',
+    });
+    expect(report.links[1]?.finalUrl).toBeUndefined();
+    expect(report.links[1]?.statusCode).toBeUndefined();
+    expect(report.summary).toMatchObject({
+      redirects: 1,
+      unreachableLinks: 1,
+    });
   });
 });

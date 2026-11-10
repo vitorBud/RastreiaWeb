@@ -6,6 +6,31 @@ export type AuditCategory =
 
 export type AuditSeverity = 'critical' | 'serious' | 'moderate' | 'minor';
 
+export type AuditLinkState =
+  | 'broken'
+  | 'not_checked'
+  | 'ok'
+  | 'redirected'
+  | 'restricted'
+  | 'unavailable'
+  | 'unreachable';
+
+export type AuditLinkCheckReason = 'invalid_url' | 'limit' | 'unsupported_protocol';
+
+export interface AuditLinkResult {
+  checkReason?: AuditLinkCheckReason;
+  declaredHref: string;
+  element: string;
+  finalUrl?: string;
+  pageUrl: string;
+  position: number;
+  redirects: string[];
+  state: AuditLinkState;
+  statusCode?: number;
+  targetUrl: string;
+  text: string;
+}
+
 export interface AuditIssue {
   category: AuditCategory;
   code: string;
@@ -40,6 +65,7 @@ export interface AuditReport {
   finalUrl: string;
   initialUrl: string;
   issues: AuditIssue[];
+  links: AuditLinkResult[];
   limits: {
     maxLinks: number;
     maxResources: number;

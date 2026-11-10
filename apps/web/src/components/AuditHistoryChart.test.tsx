@@ -17,6 +17,7 @@ function createReport(index: number, totalIssues: number): AuditReport {
       pageUrl: `https://site-${index}.example.com/`,
       severity: 'serious',
     })),
+    links: [],
     limits: { maxLinks: 20, maxResources: 20 },
     pageTitle: `Site ${index}`,
     summary: {
@@ -24,8 +25,8 @@ function createReport(index: number, totalIssues: number): AuditReport {
       failedResources: 0,
       imagesFound: 0,
       imagesWithoutAlt: 0,
-      linksChecked: 1,
-      linksFound: 1,
+      linksChecked: 0,
+      linksFound: 0,
       redirects: 0,
       restrictedLinks: 0,
       resourcesChecked: 0,

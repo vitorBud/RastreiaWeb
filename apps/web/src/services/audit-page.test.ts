@@ -22,6 +22,7 @@ describe('runPageAudit', () => {
       finalUrl: 'https://example.com/',
       initialUrl: 'https://example.com',
       issues: [],
+      links: [],
       limits: { maxLinks: 20, maxResources: 20 },
       pageTitle: 'Example Domain',
       summary: {
@@ -62,5 +63,45 @@ describe('runPageAudit', () => {
         code: 'PRIVATE_ADDRESS',
         message: 'A URL aponta para um endereço privado ou reservado.',
       });
+  });
+
+  it('rejeita um inventário de links malformado', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      analyzedAt: '2026-11-09T12:00:00.000Z',
+      disclaimer: 'Análise automática.',
+      durationMs: 100,
+      finalUrl: 'https://example.com/',
+      initialUrl: 'https://example.com',
+      issues: [],
+      links: [{
+        declaredHref: '/pagina',
+        element: '<a href="/pagina">Página</a>',
+        pageUrl: 'https://example.com/',
+        position: 1,
+        redirects: [],
+        state: 'not_checked',
+        targetUrl: 'https://example.com/pagina',
+        text: 'Página',
+      }],
+      limits: { maxLinks: 20, maxResources: 20 },
+      pageTitle: 'Example Domain',
+      summary: {
+        brokenLinks: 0,
+        failedResources: 0,
+        imagesFound: 0,
+        imagesWithoutAlt: 0,
+        linksChecked: 0,
+        linksFound: 0,
+        redirects: 0,
+        restrictedLinks: 0,
+        resourcesChecked: 0,
+        unavailableLinks: 0,
+        unreachableLinks: 0,
+        totalIssues: 0,
+      },
+    }), { status: 200 }));
+
+    await expect(runPageAudit('https://example.com', defaultSettings)).rejects
+      .toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 });

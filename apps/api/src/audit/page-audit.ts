@@ -1,9 +1,12 @@
 import {
   createDocumentInventory,
   type DocumentInventory,
+  type DocumentLink,
 } from '@rastreiaweb/audit-engine';
 import type {
   AuditIssue,
+  AuditLinkResult,
+  AuditLinkState,
   AuditReport,
   AuditSeverity,
 } from '@rastreiaweb/shared';
@@ -46,10 +49,14 @@ type TargetState =
   | 'unreachable';
 
 interface TargetCheckResult {
+  finalUrl?: string;
   issues: AuditIssue[];
-  redirected: boolean;
+  redirects: string[];
   state: TargetState;
+  statusCode?: number;
 }
+
+type CheckableDocumentLink = DocumentLink & { checkUrl: string };
 
 function readableFileName(targetUrl: string): string {
   try {
@@ -72,6 +79,19 @@ function uniqueByTarget<T extends { targetUrl: string }>(items: T[]): T[] {
     }
 
     seen.add(item.targetUrl);
+    return true;
+  });
+}
+
+function uniqueByCheckUrl(items: CheckableDocumentLink[]): CheckableDocumentLink[] {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.checkUrl)) {
+      return false;
+    }
+
+    seen.add(item.checkUrl);
     return true;
   });
 }
@@ -194,7 +214,13 @@ async function checkTarget(
       state = 'unavailable';
     }
 
-    return { issues, redirected: response.redirects.length > 0, state };
+    return {
+      finalUrl: response.finalUrl,
+      issues,
+      redirects: response.redirects,
+      state,
+      statusCode: response.statusCode,
+    };
   } catch (error) {
     const description = error instanceof AuditNetworkError
       ? error.message
@@ -211,7 +237,7 @@ async function checkTarget(
         suggestion: 'Confirme se a URL é pública, válida e está disponível.',
         targetUrl,
       }],
-      redirected: false,
+      redirects: [],
       state: 'unreachable',
     };
   }
@@ -277,7 +303,12 @@ export async function auditPage(
     pageResponse.body,
     pageResponse.finalUrl,
   );
-  const links = inventory.links.slice(0, maxLinks);
+  const checkableLinks = inventory.links.filter(
+    (link): link is CheckableDocumentLink =>
+      link.checkable && typeof link.checkUrl === 'string',
+  );
+  const uniqueCheckableLinks = uniqueByCheckUrl(checkableLinks);
+  const linksToCheck = uniqueCheckableLinks.slice(0, maxLinks);
   const resources = [
     ...uniqueByTarget(inventory.images)
       .map((image) => ({ ...image, kind: 'image' as const })),
@@ -296,10 +327,10 @@ export async function auditPage(
       targetUrl: image.targetUrl,
     }));
 
-  const linkResults = await mapWithConcurrency(links, 4, (link) =>
+  const linkResults = await mapWithConcurrency(linksToCheck, 4, (link) =>
     checkTarget(
       pageResponse.finalUrl,
-      link.targetUrl,
+      link.checkUrl,
       link.element,
       'link',
       requestUrl,
@@ -319,6 +350,43 @@ export async function auditPage(
     ...linkResults.flatMap((result) => result.issues),
     ...resourceResults.flatMap((result) => result.issues),
   );
+  const linkResultByCheckUrl = new Map<string, TargetCheckResult>();
+
+  linksToCheck.forEach((link, index) => {
+    const result = linkResults[index];
+
+    if (result) {
+      linkResultByCheckUrl.set(link.checkUrl, result);
+    }
+  });
+  const auditedLinks = inventory.links.map((link, index) => {
+    const result = link.checkUrl
+      ? linkResultByCheckUrl.get(link.checkUrl)
+      : undefined;
+    const state: AuditLinkState = result
+      ? result.state === 'ok' && result.redirects.length > 0
+        ? 'redirected'
+        : result.state
+      : 'not_checked';
+
+    return {
+      checkReason: result
+        ? undefined
+        : link.checkable && link.checkUrl
+          ? 'limit'
+          : link.uncheckableReason ?? 'unsupported_protocol',
+      declaredHref: link.declaredHref,
+      element: link.element,
+      finalUrl: result?.finalUrl,
+      pageUrl: pageResponse.finalUrl,
+      position: index + 1,
+      redirects: result?.redirects ?? [],
+      state,
+      statusCode: result?.statusCode,
+      targetUrl: link.targetUrl,
+      text: link.text,
+    } satisfies AuditLinkResult;
+  });
 
   return {
     analyzedAt: new Date().toISOString(),
@@ -327,6 +395,7 @@ export async function auditPage(
     finalUrl: pageResponse.finalUrl,
     initialUrl: inputUrl,
     issues,
+    links: auditedLinks,
     limits: { maxLinks, maxResources },
     pageTitle: inventory.title || new URL(pageResponse.finalUrl).hostname,
     summary: {
@@ -336,10 +405,10 @@ export async function auditPage(
       ).length,
       imagesFound: inventory.images.length,
       imagesWithoutAlt: inventory.images.filter((image) => image.alt === null).length,
-      linksChecked: links.length,
-      linksFound: inventory.links.length,
+      linksChecked: linksToCheck.length,
+      linksFound: uniqueCheckableLinks.length,
       redirects: [...linkResults, ...resourceResults]
-        .filter((result) => result.redirected).length,
+        .filter((result) => result.redirects.length > 0).length,
       restrictedLinks: linkResults.filter((result) => result.state === 'restricted').length,
       resourcesChecked: resources.length,
       totalIssues: issues.length,

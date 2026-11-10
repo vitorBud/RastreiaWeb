@@ -20,8 +20,8 @@ export function HelpView() {
         </article>
         <article className="page-panel">
           <span>03</span>
-          <h3>Revise as ocorrências</h3>
-          <p>Erros do teste HEAD são confirmados com GET. Só 404 ou 410 confirmados entram como links quebrados.</p>
+          <h3>Revise ocorrências e links</h3>
+          <p>Em “Todos os links”, veja cada elemento na ordem da página. Erros do teste HEAD são confirmados com GET; só 404 ou 410 confirmados entram como quebrados.</p>
         </article>
         <article className="page-panel">
           <span>04</span>
@@ -38,6 +38,7 @@ export function HelpView() {
           <li>Responsividade e regras completas do axe-core entrarão nas próximas versões.</li>
           <li>Sites que bloqueiam requisições automatizadas podem retornar resultados inconclusivos.</li>
           <li>Respostas 401, 403 e 429 são inconclusivas e devem ser confirmadas manualmente.</li>
+          <li>Todos os links do HTML estático são listados, mas somente a quantidade configurada de destinos HTTP únicos recebe requisições.</li>
           <li>Imagens em CSS, inseridas por JavaScript ou sem atributo src ainda ficam fora da verificação inicial.</li>
         </ul>
       </div>

@@ -15,12 +15,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function isAuditLinkResult(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const state = typeof value.state === 'string' ? value.state : '';
+  const validCheckReason = state === 'not_checked'
+    ? value.checkReason === 'invalid_url' ||
+      value.checkReason === 'limit' ||
+      value.checkReason === 'unsupported_protocol'
+    : value.checkReason === undefined;
+
+  return (
+    typeof value.declaredHref === 'string' &&
+    typeof value.element === 'string' &&
+    typeof value.pageUrl === 'string' &&
+    typeof value.position === 'number' &&
+    Number.isInteger(value.position) &&
+    value.position > 0 &&
+    Array.isArray(value.redirects) &&
+    value.redirects.every((redirect) => typeof redirect === 'string') &&
+    validCheckReason &&
+    (value.finalUrl === undefined || typeof value.finalUrl === 'string') &&
+    (value.statusCode === undefined || (
+      typeof value.statusCode === 'number' &&
+      Number.isInteger(value.statusCode) &&
+      value.statusCode >= 100 &&
+      value.statusCode <= 599
+    )) &&
+    [
+      'broken',
+      'not_checked',
+      'ok',
+      'redirected',
+      'restricted',
+      'unavailable',
+      'unreachable',
+    ].includes(state) &&
+    typeof value.targetUrl === 'string' &&
+    typeof value.text === 'string'
+  );
+}
+
 function isAuditReport(value: unknown): value is AuditReport {
   if (
     !isRecord(value) ||
     !isRecord(value.limits) ||
     !isRecord(value.summary) ||
-    !Array.isArray(value.issues)
+    !Array.isArray(value.issues) ||
+    !Array.isArray(value.links)
   ) {
     return false;
   }
@@ -57,7 +101,8 @@ function isAuditReport(value: unknown): value is AuditReport {
       typeof issue.description === 'string' &&
       typeof issue.pageUrl === 'string' &&
       typeof issue.severity === 'string'
-    )
+    ) &&
+    value.links.every(isAuditLinkResult)
   );
 }
 

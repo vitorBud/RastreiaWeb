@@ -3,6 +3,14 @@ import type { AuditReport, AuditSettings } from '../types/audit';
 const historyKey = 'rastreiaweb:audit-history';
 const settingsKey = 'rastreiaweb:settings';
 
+type NewSummaryField = 'restrictedLinks' | 'unavailableLinks' | 'unreachableLinks';
+
+type StoredAuditReport = Omit<AuditReport, 'links' | 'summary'> & {
+  links?: unknown[];
+  summary: Omit<AuditReport['summary'], NewSummaryField> &
+    Partial<Pick<AuditReport['summary'], NewSummaryField>>;
+};
+
 export const defaultSettings: AuditSettings = {
   autoOpenReport: true,
   historyLimit: 10,
@@ -14,22 +22,109 @@ function getStorage(): Storage | null {
   return typeof window === 'undefined' ? null : window.localStorage;
 }
 
-function isStoredReport(item: unknown): item is AuditReport {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isStoredLink(value: unknown): value is AuditReport['links'][number] {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const state = typeof value.state === 'string' ? value.state : '';
+  const validCheckReason = state === 'not_checked'
+    ? value.checkReason === 'invalid_url' ||
+      value.checkReason === 'limit' ||
+      value.checkReason === 'unsupported_protocol'
+    : value.checkReason === undefined;
+
   return (
-    typeof item === 'object' &&
-    item !== null &&
-    'analyzedAt' in item && typeof item.analyzedAt === 'string' &&
-    'finalUrl' in item && typeof item.finalUrl === 'string' &&
-    'initialUrl' in item && typeof item.initialUrl === 'string' &&
-    'issues' in item && Array.isArray(item.issues) &&
-    'pageTitle' in item && typeof item.pageTitle === 'string' &&
-    'summary' in item && typeof item.summary === 'object' && item.summary !== null
+    typeof value.declaredHref === 'string' &&
+    typeof value.element === 'string' &&
+    typeof value.pageUrl === 'string' &&
+    typeof value.position === 'number' &&
+    Number.isInteger(value.position) &&
+    value.position > 0 &&
+    Array.isArray(value.redirects) &&
+    value.redirects.every((redirect) => typeof redirect === 'string') &&
+    validCheckReason &&
+    (value.finalUrl === undefined || typeof value.finalUrl === 'string') &&
+    (value.statusCode === undefined || (
+      typeof value.statusCode === 'number' &&
+      Number.isInteger(value.statusCode) &&
+      value.statusCode >= 100 &&
+      value.statusCode <= 599
+    )) &&
+    [
+      'broken',
+      'not_checked',
+      'ok',
+      'redirected',
+      'restricted',
+      'unavailable',
+      'unreachable',
+    ].includes(state) &&
+    typeof value.targetUrl === 'string' &&
+    typeof value.text === 'string'
   );
 }
 
-function normalizeStoredReport(report: AuditReport): AuditReport {
+function isStoredReport(item: unknown): item is StoredAuditReport {
+  if (!isRecord(item) || !isRecord(item.limits) || !isRecord(item.summary)) {
+    return false;
+  }
+
+  const summaryFields = [
+    'brokenLinks',
+    'failedResources',
+    'imagesFound',
+    'imagesWithoutAlt',
+    'linksChecked',
+    'linksFound',
+    'redirects',
+    'resourcesChecked',
+    'totalIssues',
+  ];
+
+  return (
+    typeof item.analyzedAt === 'string' &&
+    typeof item.disclaimer === 'string' &&
+    typeof item.durationMs === 'number' &&
+    typeof item.finalUrl === 'string' &&
+    typeof item.initialUrl === 'string' &&
+    Array.isArray(item.issues) &&
+    item.issues.every((issue) =>
+      isRecord(issue) &&
+      ['accessibility', 'link', 'resource', 'responsive']
+        .includes(String(issue.category)) &&
+      typeof issue.code === 'string' &&
+      typeof issue.description === 'string' &&
+      typeof issue.pageUrl === 'string' &&
+      ['critical', 'serious', 'moderate', 'minor']
+        .includes(String(issue.severity)) &&
+      (issue.element === undefined || typeof issue.element === 'string') &&
+      (issue.statusCode === undefined || typeof issue.statusCode === 'number') &&
+      (issue.suggestion === undefined || typeof issue.suggestion === 'string') &&
+      (issue.targetUrl === undefined || typeof issue.targetUrl === 'string')
+    ) &&
+    (item.links === undefined || Array.isArray(item.links)) &&
+    typeof item.limits.maxLinks === 'number' &&
+    typeof item.limits.maxResources === 'number' &&
+    typeof item.pageTitle === 'string' &&
+    summaryFields.every((field) => typeof item.summary[field] === 'number') &&
+    (item.summary.restrictedLinks === undefined ||
+      typeof item.summary.restrictedLinks === 'number') &&
+    (item.summary.unavailableLinks === undefined ||
+      typeof item.summary.unavailableLinks === 'number') &&
+    (item.summary.unreachableLinks === undefined ||
+      typeof item.summary.unreachableLinks === 'number')
+  );
+}
+
+function normalizeStoredReport(report: StoredAuditReport): AuditReport {
   return {
     ...report,
+    links: report.links?.filter(isStoredLink) ?? [],
     summary: {
       ...report.summary,
       restrictedLinks: report.summary.restrictedLinks ?? 0,

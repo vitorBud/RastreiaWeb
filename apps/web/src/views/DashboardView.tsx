@@ -1,7 +1,13 @@
-import type { AppView, AuditCategory, AuditReport } from '../types/audit';
+import type {
+  AppView,
+  AuditCategory,
+  AuditReport,
+  ReportFocus,
+} from '../types/audit';
 import { AuditForm } from '../components/AuditForm';
 import { AuditHistoryChart } from '../components/AuditHistoryChart';
 import { Icon } from '../components/Icon';
+import { MissingAltOverview } from '../components/MissingAltOverview';
 
 interface DashboardViewProps {
   auditError: string;
@@ -9,6 +15,7 @@ interface DashboardViewProps {
   isAuditing: boolean;
   onAudit: (url: string) => Promise<void>;
   onNavigate: (view: AppView) => void;
+  onOpenReport: (focus?: ReportFocus) => void;
   onResetError: () => void;
   onSelectReport: (report: AuditReport) => void;
   report: AuditReport | null;
@@ -38,6 +45,9 @@ export function DashboardView(props: DashboardViewProps) {
   const { report } = props;
   const issueCount = (category: AuditCategory) =>
     report?.issues.filter((issue) => issue.category === category).length ?? 0;
+  const missingAltIssues = report?.issues.filter(
+    (issue) => issue.code === 'IMAGE_ALT_MISSING',
+  ) ?? [];
   const linkCoverage = report
     ? report.summary.linksFound === 0
       ? 100
@@ -74,7 +84,7 @@ export function DashboardView(props: DashboardViewProps) {
           <div
             className="progress-track"
             role="progressbar"
-            aria-label="Cobertura dos links encontrados"
+            aria-label="Cobertura dos destinos HTTP encontrados"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={linkCoverage}
@@ -82,7 +92,7 @@ export function DashboardView(props: DashboardViewProps) {
             <span style={{ width: `${linkCoverage}%` }} />
           </div>
           <div className="progress-label">
-            <span>{report ? `Cobertura de links · ${getHostname(report.finalUrl)}` : 'Base técnica'}</span>
+            <span>{report ? `Cobertura de destinos HTTP · ${getHostname(report.finalUrl)}` : 'Base técnica'}</span>
             <strong>{report ? `${linkCoverage}%` : 'Concluída'}</strong>
           </div>
         </article>
@@ -101,14 +111,17 @@ export function DashboardView(props: DashboardViewProps) {
         <article className="card categories-card">
           <div className="card-heading">
             <span>Categorias da auditoria</span>
-            <button className="text-button" type="button" onClick={() => props.onNavigate('reports')}>
+            <button className="text-button" type="button" onClick={() => props.onOpenReport()}>
               Ver relatório
             </button>
           </div>
           <ul>
             {categories.map((item) => (
               <li key={item.category}>
-                <button type="button" onClick={() => props.onNavigate('reports')}>
+                <button
+                  type="button"
+                  onClick={() => props.onOpenReport({ category: item.category })}
+                >
                   <span className={`category-icon ${item.className}`} aria-hidden="true" />
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>
                   <span className="pending-badge">
@@ -128,11 +141,21 @@ export function DashboardView(props: DashboardViewProps) {
             <span className="scope-count">v0.1</span>
           </div>
           <div className="scope-grid">
-            <div><small>Links verificados</small><strong>{report?.summary.linksChecked ?? 0}</strong><span>de {report?.summary.linksFound ?? 0} encontrados</span></div>
+            <div><small>Destinos verificados</small><strong>{report?.summary.linksChecked ?? 0}</strong><span>de {report?.summary.linksFound ?? 0} destinos HTTP únicos</span></div>
             <div><small>Recursos verificados</small><strong>{report?.summary.resourcesChecked ?? 0}</strong><span>{report?.summary.failedResources ?? 0} com falha</span></div>
-            <div><small>Imagens encontradas</small><strong>{report?.summary.imagesFound ?? 0}</strong><span>{report?.summary.imagesWithoutAlt ?? 0} sem alt</span></div>
+            <div><small>Imagens encontradas</small><strong>{report?.summary.imagesFound ?? 0}</strong><span>{missingAltIssues.length} ocorrências sem alt</span></div>
             <div><small>Páginas distintas</small><strong>{new Set(props.history.map((item) => item.finalUrl)).size}</strong><span>{props.history.length} auditorias salvas</span></div>
           </div>
+          {report && (
+            <button
+              className="scope-links-action"
+              type="button"
+              onClick={() => props.onOpenReport({ section: 'links' })}
+            >
+              <span>Ver todos os links encontrados</span>
+              <strong>{report.links.length} elemento(s) <span aria-hidden="true">→</span></strong>
+            </button>
+          )}
         </article>
 
         <article className="card chart-card">
@@ -142,7 +165,7 @@ export function DashboardView(props: DashboardViewProps) {
               <h2>Auditorias recentes</h2>
             </div>
             {report && (
-              <button className="secondary-button" type="button" onClick={() => props.onNavigate('reports')}>
+              <button className="secondary-button" type="button" onClick={() => props.onOpenReport()}>
                 Abrir detalhes
               </button>
             )}
@@ -154,6 +177,18 @@ export function DashboardView(props: DashboardViewProps) {
           />
         </article>
 
+        <MissingAltOverview
+          issues={missingAltIssues}
+          onOpenAll={() => props.onOpenReport({
+            category: 'accessibility',
+            query: 'IMAGE_ALT_MISSING',
+          })}
+          onOpenIssue={(issue) => props.onOpenReport({
+            category: 'accessibility',
+            query: issue.element ?? issue.targetUrl ?? issue.description,
+          })}
+        />
+
         <article className="card next-card">
           <span className="step-number">{report ? '✓' : '01'}</span>
           <div>
@@ -161,7 +196,12 @@ export function DashboardView(props: DashboardViewProps) {
             <h2>{report ? 'Revise as ocorrências encontradas' : 'Execute a primeira auditoria'}</h2>
             <p>{report ? report.disclaimer : 'A página será analisada com limites de segurança e sem crawler irrestrito.'}</p>
           </div>
-          <button className="next-arrow" type="button" onClick={() => props.onNavigate(report ? 'reports' : 'new-audit')} aria-label={report ? 'Abrir relatório' : 'Criar auditoria'}>
+          <button
+            className="next-arrow"
+            type="button"
+            onClick={() => report ? props.onOpenReport() : props.onNavigate('new-audit')}
+            aria-label={report ? 'Abrir relatório' : 'Criar auditoria'}
+          >
             ↗
           </button>
         </article>

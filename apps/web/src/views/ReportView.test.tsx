@@ -39,6 +39,67 @@ const report: AuditReport = {
       targetUrl: 'https://cdn.example.net/banner-home.jpg',
     },
   ],
+  links: [
+    {
+      declaredHref: '/documentacao',
+      element: '<a href="/documentacao">Documentação</a>',
+      finalUrl: 'https://example.com/documentacao',
+      pageUrl: 'https://example.com/',
+      position: 1,
+      redirects: [],
+      state: 'ok',
+      statusCode: 200,
+      targetUrl: 'https://example.com/documentacao',
+      text: 'Documentação',
+    },
+    {
+      declaredHref: '/docs-antiga',
+      element: '<a href="/docs-antiga">Documentação antiga</a>',
+      finalUrl: 'https://example.com/documentacao',
+      pageUrl: 'https://example.com/',
+      position: 2,
+      redirects: ['https://example.com/documentacao'],
+      state: 'redirected',
+      statusCode: 200,
+      targetUrl: 'https://example.com/docs-antiga',
+      text: 'Documentação antiga',
+    },
+    {
+      declaredHref: '/quebrado',
+      element: '<a href="/quebrado">Página ausente</a>',
+      finalUrl: 'https://example.com/quebrado',
+      pageUrl: 'https://example.com/',
+      position: 3,
+      redirects: [],
+      state: 'broken',
+      statusCode: 404,
+      targetUrl: 'https://example.com/quebrado',
+      text: 'Página ausente',
+    },
+    {
+      declaredHref: '/restrito',
+      element: '<a href="/restrito">Área restrita</a>',
+      finalUrl: 'https://example.com/restrito',
+      pageUrl: 'https://example.com/',
+      position: 4,
+      redirects: [],
+      state: 'restricted',
+      statusCode: 403,
+      targetUrl: 'https://example.com/restrito',
+      text: 'Área restrita',
+    },
+    {
+      checkReason: 'unsupported_protocol',
+      declaredHref: 'mailto:contato@example.com',
+      element: '<a href="mailto:contato@example.com">E-mail</a>',
+      pageUrl: 'https://example.com/',
+      position: 5,
+      redirects: [],
+      state: 'not_checked',
+      targetUrl: 'mailto:contato@example.com',
+      text: 'E-mail',
+    },
+  ],
   limits: { maxLinks: 20, maxResources: 20 },
   pageTitle: 'Exemplo',
   summary: {
@@ -46,9 +107,9 @@ const report: AuditReport = {
     failedResources: 0,
     imagesFound: 1,
     imagesWithoutAlt: 1,
-    linksChecked: 2,
-    linksFound: 2,
-    redirects: 0,
+    linksChecked: 4,
+    linksFound: 4,
+    redirects: 1,
     restrictedLinks: 1,
     resourcesChecked: 0,
     totalIssues: 3,
@@ -110,5 +171,58 @@ describe('ReportView', () => {
     )).toBeInTheDocument();
     expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
     expect(screen.queryByText('Verificação inconclusiva.')).not.toBeInTheDocument();
+  });
+
+  it('inicia com o foco solicitado pela visão geral', () => {
+    render(
+      <ReportView
+        initialFocus={{
+          category: 'accessibility',
+          query: 'IMAGE_ALT_MISSING',
+        }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: 'Categoria' }))
+      .toHaveValue('accessibility');
+    expect(screen.getByRole('searchbox', { name: 'Buscar' }))
+      .toHaveValue('IMAGE_ALT_MISSING');
+    expect(screen.getByText(
+      'A imagem "banner-home.jpg" foi encontrada sem o atributo alt.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Verificação inconclusiva.')).not.toBeInTheDocument();
+  });
+
+  it('organiza todos os links em uma seção separada', () => {
+    render(<ReportView onNavigate={vi.fn()} report={report} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Todos os links/ }));
+
+    expect(screen.getByRole('heading', { name: 'Todos os links encontrados' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('Documentação')).toBeInTheDocument();
+    expect(screen.getByText('Documentação antiga')).toBeInTheDocument();
+    expect(screen.getByText('Página ausente')).toBeInTheDocument();
+    expect(screen.getByText('Área restrita')).toBeInTheDocument();
+    expect(screen.getByText('E-mail')).toBeInTheDocument();
+    expect(screen.queryByText('Link quebrado confirmado.')).not.toBeInTheDocument();
+  });
+
+  it('pode abrir diretamente no inventário de links', () => {
+    render(
+      <ReportView
+        initialFocus={{ section: 'links' }}
+        onNavigate={vi.fn()}
+        report={report}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Todos os links/ }))
+      .toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'Todos os links encontrados' }))
+      .toBeInTheDocument();
   });
 });

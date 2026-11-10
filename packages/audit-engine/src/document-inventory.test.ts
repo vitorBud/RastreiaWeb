@@ -23,8 +23,17 @@ describe('createDocumentInventory', () => {
     expect(inventory.title).toBe('Página de teste');
     expect(inventory.links).toEqual([
       expect.objectContaining({
-        targetUrl: 'https://example.com/sobre',
+        checkable: true,
+        checkUrl: 'https://example.com/sobre',
+        declaredHref: '/sobre#equipe',
+        targetUrl: 'https://example.com/sobre#equipe',
         text: 'Conheça a equipe',
+      }),
+      expect.objectContaining({
+        checkable: false,
+        declaredHref: 'mailto:contato@example.com',
+        targetUrl: 'mailto:contato@example.com',
+        text: 'E-mail',
       }),
     ]);
     expect(inventory.images).toEqual([
@@ -75,6 +84,50 @@ describe('createDocumentInventory', () => {
       expect.objectContaining({
         alt: '',
         targetUrl: 'https://cdn.example.net/divisor.svg',
+      }),
+    ]);
+  });
+
+  it('preserva links repetidos, fragmentos e protocolos não HTTP na ordem do HTML', async () => {
+    const inventory = await createDocumentInventory(`
+      <!doctype html>
+      <html lang="pt-BR">
+        <body>
+          <a class="menu" href="/documentacao#inicio">Documentação</a>
+          <a class="rodape" href="/documentacao#contato">Documentação no rodapé</a>
+          <a href="tel:+5511999999999">Telefone</a>
+          <a href="http://[">URL inválida</a>
+        </body>
+      </html>
+    `, 'https://example.com/inicio');
+
+    expect(inventory.links).toHaveLength(4);
+    expect(inventory.links).toEqual([
+      expect.objectContaining({
+        checkUrl: 'https://example.com/documentacao',
+        declaredHref: '/documentacao#inicio',
+        targetUrl: 'https://example.com/documentacao#inicio',
+        text: 'Documentação',
+      }),
+      expect.objectContaining({
+        checkUrl: 'https://example.com/documentacao',
+        declaredHref: '/documentacao#contato',
+        targetUrl: 'https://example.com/documentacao#contato',
+        text: 'Documentação no rodapé',
+      }),
+      expect.objectContaining({
+        checkable: false,
+        declaredHref: 'tel:+5511999999999',
+        targetUrl: 'tel:+5511999999999',
+        text: 'Telefone',
+        uncheckableReason: 'unsupported_protocol',
+      }),
+      expect.objectContaining({
+        checkable: false,
+        declaredHref: 'http://[',
+        targetUrl: 'http://[',
+        text: 'URL inválida',
+        uncheckableReason: 'invalid_url',
       }),
     ]);
   });

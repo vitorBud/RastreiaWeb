@@ -1,9 +1,13 @@
 import { chromium } from 'playwright';
 
 export interface DocumentLink {
+  checkable: boolean;
+  checkUrl?: string;
+  declaredHref: string;
   element: string;
   targetUrl: string;
   text: string;
+  uncheckableReason?: 'invalid_url' | 'unsupported_protocol';
 }
 
 export interface DocumentImage {
@@ -86,15 +90,53 @@ export async function createDocumentInventory(
         }
       };
 
+      const toLinkTarget = (value: string | null) => {
+        if (value === null) {
+          return null;
+        }
+
+        try {
+          const target = new URL(value, baseUrl);
+          const checkable = target.protocol === 'http:' || target.protocol === 'https:';
+          let checkUrl: string | undefined;
+
+          if (checkable) {
+            const requestTarget = new URL(target);
+            requestTarget.hash = '';
+            checkUrl = requestTarget.toString();
+          }
+
+          return {
+            checkable,
+            checkUrl,
+            declaredHref: value,
+            targetUrl: target.toString(),
+            uncheckableReason: checkable ? undefined : 'unsupported_protocol' as const,
+          };
+        } catch {
+          return {
+            checkable: false,
+            checkUrl: undefined,
+            declaredHref: value,
+            targetUrl: value,
+            uncheckableReason: 'invalid_url' as const,
+          };
+        }
+      };
+
       const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
-        .map((element) => ({
-          element: htmlPreview(element),
-          targetUrl: toPublicHttpUrl(element.getAttribute('href')),
-          text: element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 160) ?? '',
-        }))
-        .filter((item): item is { element: string; targetUrl: string; text: string } =>
-          item.targetUrl !== null,
-        );
+        .map((element) => {
+          const target = toLinkTarget(element.getAttribute('href'));
+
+          return target
+            ? {
+                ...target,
+                element: htmlPreview(element),
+                text: element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 160) ?? '',
+              }
+            : null;
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
       const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[src]'))
         .map((element) => ({
@@ -141,7 +183,9 @@ export async function createDocumentInventory(
       // O texto alternativo pertence a cada elemento, não ao arquivo da imagem.
       // Preservamos ocorrências repetidas para não esconder um <img> sem alt.
       images: inventory.images,
-      links: uniqueByTarget(inventory.links),
+      // A lista completa mantém a ordem e os usos repetidos de cada <a>.
+      // A API deduplica apenas os destinos enviados para verificação HTTP.
+      links: inventory.links,
       resources: uniqueByTarget(inventory.resources),
     };
   } finally {
