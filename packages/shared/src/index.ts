@@ -78,6 +78,10 @@ export interface ResponsiveViewportResult {
 export interface ResponsiveAuditResult {
   message: string;
   status: 'completed' | 'unavailable';
+  styleCoverage?: {
+    discovered: number;
+    loaded: number;
+  };
   viewports: ResponsiveViewportResult[];
 }
 

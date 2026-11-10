@@ -65,6 +65,11 @@ function ResponsiveOverview({ report }: { report: AuditReport }) {
     return null;
   }
 
+  const hasPartialStyles = Boolean(
+    result.styleCoverage &&
+    result.styleCoverage.loaded < result.styleCoverage.discovered,
+  );
+
   return (
     <section className="responsive-overview page-panel" aria-labelledby="responsive-title">
       <div className="responsive-overview-heading">
@@ -73,8 +78,10 @@ function ResponsiveOverview({ report }: { report: AuditReport }) {
           <h2 id="responsive-title">Responsividade</h2>
           <p>{result.message}</p>
         </div>
-        <span className={`responsive-analysis-state ${result.status}`}>
-          {result.status === 'completed' ? 'Análise concluída' : 'Análise indisponível'}
+        <span className={`responsive-analysis-state ${hasPartialStyles ? 'partial' : result.status}`}>
+          {result.status === 'unavailable'
+            ? 'Análise indisponível'
+            : hasPartialStyles ? 'Análise parcial' : 'Análise concluída'}
         </span>
       </div>
 
@@ -82,6 +89,11 @@ function ResponsiveOverview({ report }: { report: AuditReport }) {
         <div className="responsive-viewport-grid">
           {result.viewports.map((viewport) => {
             const issueCount = viewport.overflowingElements.length;
+            const overflowPixels = Math.max(
+              0,
+              viewport.documentWidth - viewport.width,
+              ...viewport.overflowingElements.map((element) => element.overflowPixels),
+            );
 
             return (
               <article
@@ -93,17 +105,66 @@ function ResponsiveOverview({ report }: { report: AuditReport }) {
                   <strong>{viewport.width} × {viewport.height}</strong>
                 </div>
                 <span className="responsive-viewport-state">
-                  {viewport.horizontalOverflow ? 'Overflow detectado' : 'Sem overflow horizontal'}
+                  {viewport.horizontalOverflow
+                    ? 'Overflow detectado'
+                    : hasPartialStyles ? 'Sem overflow no CSS carregado' : 'Sem overflow horizontal'}
                 </span>
-                <dl>
-                  <div><dt>Largura do documento</dt><dd>{viewport.documentWidth}px</dd></div>
-                  <div><dt>Elementos sinalizados</dt><dd>{issueCount}</dd></div>
-                </dl>
+
+                <div className="responsive-pixel-summary">
+                  <div><small>Largura testada</small><strong>{viewport.width}px</strong></div>
+                  <div><small>Largura encontrada</small><strong>{viewport.documentWidth}px</strong></div>
+                  <div><small>Excesso horizontal</small><strong>{overflowPixels}px</strong></div>
+                </div>
+
+                {viewport.horizontalOverflow ? (
+                  <div className="responsive-breakpoint-result">
+                    <p>
+                      <strong>Quebra detectada em {viewport.width}px.</strong>
+                      {' '}O conteúdo ultrapassou a tela em {overflowPixels}px.
+                    </p>
+
+                    {issueCount > 0 ? (
+                      <details>
+                        <summary>{issueCount} elemento(s) responsável(is)</summary>
+                        <ol>
+                          {viewport.overflowingElements.map((element, index) => (
+                            <li key={`${element.selector}-${index}`}>
+                              <div>
+                                <code>{element.selector}</code>
+                                <strong>+{element.overflowPixels}px</strong>
+                              </div>
+                              <pre><code>{element.element}</code></pre>
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    ) : (
+                      <span>O documento excedeu a viewport, mas nenhum elemento isolado foi confirmado.</span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="responsive-clean-result">
+                    {hasPartialStyles
+                      ? `Nenhuma quebra foi detectada em ${viewport.width}px com o CSS disponível.`
+                      : `Nenhuma quebra horizontal foi detectada exatamente em ${viewport.width}px.`}
+                  </p>
+                )}
+
+                {result.styleCoverage && (
+                  <small className="responsive-css-coverage">
+                    CSS carregado: {result.styleCoverage.loaded} de {result.styleCoverage.discovered} folha(s)
+                  </small>
+                )}
               </article>
             );
           })}
         </div>
       )}
+
+      <p className="responsive-method-note">
+        Os resultados correspondem às larguras fixas testadas. Problemas entre esses valores ainda podem exigir revisão manual.
+        {hasPartialStyles && ' Parte do CSS não pôde ser carregada, então confirme o resultado manualmente.'}
+      </p>
     </section>
   );
 }

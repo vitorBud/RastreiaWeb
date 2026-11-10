@@ -73,6 +73,9 @@ export async function analyzeResponsiveLayout(
         });
 
         await page.evaluate((stylesheetContents) => {
+          document.querySelectorAll('noscript').forEach((element) => element.remove());
+          document.documentElement.classList.remove('no-js');
+
           for (const content of stylesheetContents) {
             const style = document.createElement('style');
             style.dataset.rastreiaweb = 'responsive-audit';
@@ -185,11 +188,11 @@ export async function analyzeResponsiveLayout(
             overflowingElements,
           };
         }, { fallbackUrl: pageUrl, viewportWidth: viewport.width });
-
         results.push({
           documentWidth: measurement.documentWidth,
           height: viewport.height,
-          horizontalOverflow: measurement.horizontalOverflow,
+          horizontalOverflow: measurement.horizontalOverflow ||
+            measurement.overflowingElements.length > 0,
           name: viewport.name,
           overflowingElements: measurement.overflowingElements,
           width: viewport.width,
@@ -202,7 +205,7 @@ export async function analyzeResponsiveLayout(
     }
 
     return {
-      message: 'Layout medido em três resoluções com JavaScript desativado e rede bloqueada.',
+      message: 'Layout medido em três resoluções com scripts e rede do navegador bloqueados.',
       status: 'completed',
       viewports: results,
     };

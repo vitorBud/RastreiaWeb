@@ -48,4 +48,21 @@ describe('analyzeResponsiveLayout', () => {
     expect(mobile?.horizontalOverflow).toBe(false);
     expect(mobile?.overflowingElements).toEqual([]);
   });
+
+  it('remove a apresentação alternativa de noscript antes de medir', async () => {
+    const result = await analyzeResponsiveLayout(`
+      <!doctype html>
+      <html class="no-js">
+        <body>
+          <noscript><div style="width: 900px">Ative o JavaScript</div></noscript>
+          <main style="max-width: 100%">Conteúdo principal</main>
+        </body>
+      </html>
+    `, 'https://example.com/');
+
+    expect(result.viewports.every((item) => !item.horizontalOverflow)).toBe(true);
+    expect(result.viewports.every((item) =>
+      item.overflowingElements.every((element) => !element.element.includes('noscript')),
+    )).toBe(true);
+  });
 });

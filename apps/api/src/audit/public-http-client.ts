@@ -40,6 +40,7 @@ export interface PublicHttpResponse extends RawHttpResponse {
 }
 
 export interface PublicHttpRequestOptions {
+  accept?: string;
   maxBodyBytes?: number;
   maxRedirects?: number;
   method?: 'GET' | 'HEAD';
@@ -49,7 +50,7 @@ export interface PublicHttpRequestOptions {
 
 export type RawRequest = (
   target: ValidatedPublicUrl,
-  options: Required<Pick<PublicHttpRequestOptions, 'maxBodyBytes' | 'method' | 'readBody' | 'timeoutMs'>>,
+  options: Required<Pick<PublicHttpRequestOptions, 'accept' | 'maxBodyBytes' | 'method' | 'readBody' | 'timeoutMs'>>,
 ) => Promise<RawHttpResponse>;
 
 interface PublicHttpDependencies {
@@ -95,9 +96,7 @@ export const requestPinnedAddress: RawRequest = (target, options) =>
     const requester = target.protocol === 'https:' ? httpsRequest : httpRequest;
     const request = requester({
       headers: {
-        Accept: options.readBody
-          ? 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5'
-          : '*/*',
+        Accept: options.accept,
         'Accept-Encoding': 'gzip, deflate, br',
         Host: url.host,
         'User-Agent': 'Mozilla/5.0 (compatible; RastreiaWeb/0.1; +https://github.com/vitorBud/RastreiaWeb)',
@@ -187,6 +186,9 @@ export async function requestPublicUrl(
 ): Promise<PublicHttpResponse> {
   const maxRedirects = options.maxRedirects ?? 5;
   const requestOptions = {
+    accept: options.accept ?? (options.readBody === false
+      ? '*/*'
+      : 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5'),
     maxBodyBytes: options.maxBodyBytes ?? 2_000_000,
     method: options.method ?? 'GET',
     readBody: options.readBody ?? true,

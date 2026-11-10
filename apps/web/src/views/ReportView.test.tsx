@@ -105,6 +105,7 @@ const report: AuditReport = {
   responsive: {
     message: 'Layout medido em três resoluções.',
     status: 'completed',
+    styleCoverage: { discovered: 2, loaded: 2 },
     viewports: [
       {
         documentWidth: 1440,
@@ -162,6 +163,36 @@ describe('ReportView', () => {
     expect(screen.getByText('Celular')).toBeInTheDocument();
     expect(screen.getByText('Overflow detectado')).toBeInTheDocument();
     expect(screen.getAllByText('Sem overflow horizontal')).toHaveLength(2);
+  });
+
+  it('detalha a largura quebrada e o elemento responsável', () => {
+    render(<ReportView onNavigate={vi.fn()} report={report} />);
+
+    expect(screen.getByText(/Quebra detectada em 390px/)).toBeInTheDocument();
+    expect(screen.getByText(/ultrapassou a tela em 230px/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('1 elemento(s) responsável(is)'));
+    expect(screen.getByText('main.wide')).toBeInTheDocument();
+    expect(screen.getByText('+230px')).toBeInTheDocument();
+    expect(screen.getByText('<main class="wide">Conteúdo</main>')).toBeInTheDocument();
+  });
+
+  it('não apresenta o resultado responsivo como conclusivo quando falta CSS', () => {
+    render(
+      <ReportView
+        onNavigate={vi.fn()}
+        report={{
+          ...report,
+          responsive: {
+            ...report.responsive!,
+            styleCoverage: { discovered: 3, loaded: 2 },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Análise parcial')).toBeInTheDocument();
+    expect(screen.getAllByText('Sem overflow no CSS carregado')).toHaveLength(2);
+    expect(screen.getByText(/Parte do CSS não pôde ser carregada/)).toBeInTheDocument();
   });
 
   it('distingue problemas confirmados de verificações inconclusivas', () => {

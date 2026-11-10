@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { loadAuditHistory } from './audit-storage';
+import type { AuditReport } from '../types/audit';
+import { loadAuditHistory, saveAuditHistory } from './audit-storage';
 
 const historyKey = 'rastreiaweb:audit-history';
 
@@ -74,5 +75,36 @@ describe('loadAuditHistory', () => {
     }]));
 
     expect(loadAuditHistory()[0]?.links).toEqual([]);
+  });
+
+  it('não grava capturas pesadas no histórico local', () => {
+    const report = {
+      ...legacyReport,
+      links: [],
+      responsive: {
+        message: 'Layout analisado.',
+        status: 'completed',
+        viewports: [{
+          documentWidth: 390,
+          height: 844,
+          horizontalOverflow: false,
+          name: 'mobile',
+          overflowingElements: [],
+          screenshotDataUrl: 'data:image/jpeg;base64,Y2FwdHVyYQ==',
+          width: 390,
+        }],
+      },
+      summary: {
+        ...legacyReport.summary,
+        restrictedLinks: 0,
+        unavailableLinks: 0,
+        unreachableLinks: 0,
+      },
+    } as AuditReport;
+
+    saveAuditHistory([report]);
+
+    const stored = JSON.parse(window.localStorage.getItem(historyKey) ?? '[]');
+    expect(stored[0].responsive.viewports[0].screenshotDataUrl).toBeUndefined();
   });
 });

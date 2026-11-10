@@ -494,4 +494,51 @@ describe('auditPage', () => {
     ]);
     expect(report.summary.totalIssues).toBe(1);
   });
+
+  it('informa quantas folhas CSS entraram na análise responsiva', async () => {
+    const requestUrl = vi.fn(async (
+      url: string,
+      options?: { method?: string; readBody?: boolean },
+    ): Promise<PublicHttpResponse> => {
+      if (url.endsWith('/styles.css') && options?.readBody) {
+        return {
+          ...pageResponse,
+          body: 'body { margin: 0; }',
+          finalUrl: url,
+          headers: { 'content-type': 'text/css' },
+        };
+      }
+
+      return options?.readBody
+        ? pageResponse
+        : { ...pageResponse, body: undefined, finalUrl: url };
+    });
+    const createInventory = vi.fn(async () => ({
+      images: [],
+      links: [],
+      resources: [{
+        element: '<link rel="stylesheet" href="/styles.css">',
+        kind: 'stylesheet' as const,
+        targetUrl: 'https://example.com/styles.css',
+      }],
+      title: 'Exemplo com CSS',
+    }));
+
+    const report = await auditPage('https://example.com', {}, {
+      analyzeResponsive,
+      createInventory,
+      requestUrl,
+    });
+
+    expect(analyzeResponsive).toHaveBeenLastCalledWith(
+      pageResponse.body,
+      pageResponse.finalUrl,
+      [expect.objectContaining({
+        content: 'body { margin: 0; }',
+        sourceUrl: 'https://example.com/styles.css',
+      })],
+      expect.any(Function),
+    );
+    expect(report.responsive?.styleCoverage).toEqual({ discovered: 1, loaded: 1 });
+  });
 });

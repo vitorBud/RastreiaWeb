@@ -74,6 +74,11 @@ function isStoredResponsiveResult(value: unknown): boolean {
     isRecord(value) &&
     typeof value.message === 'string' &&
     ['completed', 'unavailable'].includes(String(value.status)) &&
+    (value.styleCoverage === undefined || (
+      isRecord(value.styleCoverage) &&
+      typeof value.styleCoverage.discovered === 'number' &&
+      typeof value.styleCoverage.loaded === 'number'
+    )) &&
     Array.isArray(value.viewports) &&
     value.viewports.every((viewport) =>
       isRecord(viewport) &&
@@ -146,10 +151,29 @@ function isStoredReport(item: unknown): item is StoredAuditReport {
   );
 }
 
+function lightweightResponsiveResult(
+  responsive: AuditReport['responsive'],
+): AuditReport['responsive'] {
+  return responsive
+    ? {
+        ...responsive,
+        viewports: responsive.viewports.map((viewport) => ({
+          documentWidth: viewport.documentWidth,
+          height: viewport.height,
+          horizontalOverflow: viewport.horizontalOverflow,
+          name: viewport.name,
+          overflowingElements: viewport.overflowingElements,
+          width: viewport.width,
+        })),
+      }
+    : undefined;
+}
+
 function normalizeStoredReport(report: StoredAuditReport): AuditReport {
   return {
     ...report,
     links: report.links?.filter(isStoredLink) ?? [],
+    responsive: lightweightResponsiveResult(report.responsive),
     summary: {
       ...report.summary,
       restrictedLinks: report.summary.restrictedLinks ?? 0,
@@ -176,7 +200,12 @@ export function loadAuditHistory(): AuditReport[] {
 
 export function saveAuditHistory(history: AuditReport[]): void {
   try {
-    getStorage()?.setItem(historyKey, JSON.stringify(history));
+    const lightweightHistory = history.map((report) => ({
+      ...report,
+      responsive: lightweightResponsiveResult(report.responsive),
+    }));
+
+    getStorage()?.setItem(historyKey, JSON.stringify(lightweightHistory));
   } catch {
     // A interface continua funcional mesmo se o armazenamento estiver indisponível.
   }

@@ -269,44 +269,107 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+interface ResponsiveStylesheetLoadResult {
+  discovered: number;
+  loaded: number;
+  stylesheets: ResponsiveStylesheet[];
+}
+
+function cssImportUrls(content: string, sourceUrl: string): string[] {
+  const imports = content.matchAll(
+    /@import\s+(?:url\(\s*)?["']?([^"')\s;]+)["']?\s*\)?[^;]*;/gi,
+  );
+
+  return Array.from(imports).flatMap((match) => {
+    try {
+      const url = new URL(match[1]!, sourceUrl);
+      return ['http:', 'https:'].includes(url.protocol) ? [url.toString()] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 async function loadResponsiveStylesheets(
   inventory: DocumentInventory,
   maxResources: number,
   requestUrl: typeof requestPublicUrl,
-): Promise<ResponsiveStylesheet[]> {
-  const stylesheetResources = inventory.resources
-    .filter((resource) => resource.kind === 'stylesheet')
-    .slice(0, Math.min(maxResources, 4));
-  const stylesheets = await mapWithConcurrency(
-    stylesheetResources,
-    4,
-    async (resource): Promise<ResponsiveStylesheet | null> => {
-      try {
-        const response = await requestUrl(resource.targetUrl, {
-          maxBodyBytes: 300_000,
-          maxRedirects: 2,
-          method: 'GET',
-          readBody: true,
-          timeoutMs: 2_500,
-        });
+): Promise<ResponsiveStylesheetLoadResult> {
+  const initialUrls = uniqueByTarget(
+    inventory.resources.filter((resource) => resource.kind === 'stylesheet'),
+  ).map((resource) => resource.targetUrl);
+  const discoveredUrls = new Set(initialUrls);
+  const attemptedUrls = new Set<string>();
+  const queue = [...initialUrls];
+  const stylesheets: ResponsiveStylesheet[] = [];
+  const stylesheetLimit = Math.min(Math.max(maxResources, 1), 12);
 
-        if (response.statusCode >= 400 || !response.body) {
+  while (queue.length > 0 && attemptedUrls.size < stylesheetLimit) {
+    const batch: string[] = [];
+
+    while (
+      queue.length > 0 &&
+      batch.length < 4 &&
+      attemptedUrls.size + batch.length < stylesheetLimit
+    ) {
+      const targetUrl = queue.shift();
+
+      if (targetUrl && !attemptedUrls.has(targetUrl) && !batch.includes(targetUrl)) {
+        batch.push(targetUrl);
+      }
+    }
+
+    batch.forEach((targetUrl) => attemptedUrls.add(targetUrl));
+    const loadedBatch = await mapWithConcurrency(
+      batch,
+      4,
+      async (targetUrl): Promise<ResponsiveStylesheet | null> => {
+        try {
+          const response = await requestUrl(targetUrl, {
+            accept: 'text/css,*/*;q=0.1',
+            maxBodyBytes: 1_500_000,
+            maxRedirects: 2,
+            method: 'GET',
+            readBody: true,
+            timeoutMs: 4_000,
+          });
+
+          if (response.statusCode >= 400 || !response.body) {
+            return null;
+          }
+
+          return {
+            content: response.body,
+            sourceUrl: response.finalUrl,
+          };
+        } catch {
           return null;
         }
+      },
+    );
 
-        return {
-          content: response.body,
-          sourceUrl: response.finalUrl,
-        };
-      } catch {
-        return null;
+    for (const stylesheet of loadedBatch) {
+      if (!stylesheet) {
+        continue;
       }
-    },
-  );
 
-  return stylesheets.filter(
-    (stylesheet): stylesheet is ResponsiveStylesheet => stylesheet !== null,
-  );
+      stylesheets.push(stylesheet);
+      const imports = cssImportUrls(stylesheet.content, stylesheet.sourceUrl);
+
+      for (const importedUrl of imports.reverse()) {
+        if (!discoveredUrls.has(importedUrl)) {
+          discoveredUrls.add(importedUrl);
+          queue.unshift(importedUrl);
+        }
+      }
+    }
+  }
+
+  return {
+    discovered: discoveredUrls.size,
+    loaded: stylesheets.length,
+    stylesheets,
+  };
 }
 
 export async function auditPage(
@@ -467,7 +530,7 @@ export async function auditPage(
   let responsive: ResponsiveAuditResult;
 
   try {
-    const stylesheets = await loadResponsiveStylesheets(
+    const stylesheetResult = await loadResponsiveStylesheets(
       inventory,
       maxResources,
       requestUrl,
@@ -475,7 +538,7 @@ export async function auditPage(
     responsive = await analyzeResponsive(
       pageResponse.body,
       pageResponse.finalUrl,
-      stylesheets,
+      stylesheetResult.stylesheets,
       (completed, total) => {
         onProgress?.({
           completed,
@@ -486,6 +549,10 @@ export async function auditPage(
         });
       },
     );
+    responsive.styleCoverage = {
+      discovered: stylesheetResult.discovered,
+      loaded: stylesheetResult.loaded,
+    };
   } catch {
     responsive = {
       message: 'Não foi possível iniciar o navegador isolado para medir a responsividade.',

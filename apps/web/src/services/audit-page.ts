@@ -63,6 +63,11 @@ function isResponsiveAuditResult(value: unknown): boolean {
     isRecord(value) &&
     typeof value.message === 'string' &&
     ['completed', 'unavailable'].includes(String(value.status)) &&
+    (value.styleCoverage === undefined || (
+      isRecord(value.styleCoverage) &&
+      typeof value.styleCoverage.discovered === 'number' &&
+      typeof value.styleCoverage.loaded === 'number'
+    )) &&
     Array.isArray(value.viewports) &&
     value.viewports.every((viewport) =>
       isRecord(viewport) &&

@@ -6,6 +6,26 @@ const publicResolver = vi.fn(async () => [
 ]);
 
 describe('requestPublicUrl', () => {
+  it('permite solicitar o tipo de conteúdo adequado ao recurso', async () => {
+    const rawRequest: RawRequest = vi.fn().mockResolvedValue({
+      body: 'body { margin: 0; }',
+      headers: { 'content-type': 'text/css' },
+      statusCode: 200,
+    });
+
+    await requestPublicUrl('https://example.com/styles.css', {
+      accept: 'text/css,*/*;q=0.1',
+    }, {
+      rawRequest,
+      resolveHostname: publicResolver,
+    });
+
+    expect(rawRequest).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ accept: 'text/css,*/*;q=0.1' }),
+    );
+  });
+
   it('revalida e acompanha redirecionamentos públicos', async () => {
     const rawRequest: RawRequest = vi
       .fn()

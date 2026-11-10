@@ -36,6 +36,7 @@ export function HelpView() {
           <li>Apenas uma página é analisada por vez.</li>
           <li>O histórico permanece no navegador e ainda não possui conta ou banco de dados.</li>
           <li>A responsividade mede overflow horizontal e elementos fora da viewport em desktop, tablet e celular.</li>
+          <li>O relatório informa a largura testada, o excesso em pixels e o elemento HTML relacionado.</li>
           <li>A análise não identifica sozinha todos os problemas visuais; sobreposições e legibilidade ainda exigem revisão manual.</li>
           <li>As regras completas do axe-core entrarão nas próximas versões.</li>
           <li>Sites que bloqueiam requisições automatizadas podem retornar resultados inconclusivos.</li>
