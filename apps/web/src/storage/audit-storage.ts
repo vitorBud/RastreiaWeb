@@ -114,6 +114,7 @@ function isStoredReport(item: unknown): item is StoredAuditReport {
     'resourcesChecked',
     'totalIssues',
   ];
+  const summary = item.summary;
 
   return (
     typeof item.analyzedAt === 'string' &&
@@ -141,13 +142,13 @@ function isStoredReport(item: unknown): item is StoredAuditReport {
     typeof item.limits.maxResources === 'number' &&
     typeof item.pageTitle === 'string' &&
     (item.responsive === undefined || isStoredResponsiveResult(item.responsive)) &&
-    summaryFields.every((field) => typeof item.summary[field] === 'number') &&
-    (item.summary.restrictedLinks === undefined ||
-      typeof item.summary.restrictedLinks === 'number') &&
-    (item.summary.unavailableLinks === undefined ||
-      typeof item.summary.unavailableLinks === 'number') &&
-    (item.summary.unreachableLinks === undefined ||
-      typeof item.summary.unreachableLinks === 'number')
+    summaryFields.every((field) => typeof summary[field] === 'number') &&
+    (summary.restrictedLinks === undefined ||
+      typeof summary.restrictedLinks === 'number') &&
+    (summary.unavailableLinks === undefined ||
+      typeof summary.unavailableLinks === 'number') &&
+    (summary.unreachableLinks === undefined ||
+      typeof summary.unreachableLinks === 'number')
   );
 }
 

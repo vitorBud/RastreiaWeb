@@ -594,6 +594,7 @@ export async function auditPage(
       }));
     }));
   }
+
   const linkResultByCheckUrl = new Map<string, TargetCheckResult>();
 
   linksToCheck.forEach((link, index) => {
@@ -642,7 +643,7 @@ export async function auditPage(
 
   const report: AuditReport = {
     analyzedAt: new Date().toISOString(),
-    disclaimer: 'Esta análise automática não substitui testes manuais de acessibilidade e responsividade. A medição responsiva usa HTML e CSS públicos, com JavaScript e novas requisições do navegador bloqueados.',
+    disclaimer: 'Esta análise automática verifica imagens sem alt, links, recursos e overflow horizontal. Ela não substitui testes manuais de acessibilidade e responsividade. A medição responsiva usa HTML e CSS públicos, com JavaScript e novas requisições do navegador bloqueados.',
     durationMs: Date.now() - startedAt,
     finalUrl: pageResponse.finalUrl,
     initialUrl: inputUrl,

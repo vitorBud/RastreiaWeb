@@ -112,6 +112,7 @@ function isAuditReport(value: unknown): value is AuditReport {
     'unavailableLinks',
     'unreachableLinks',
   ];
+  const summary = value.summary;
 
   return (
     typeof value.analyzedAt === 'string' &&
@@ -123,7 +124,7 @@ function isAuditReport(value: unknown): value is AuditReport {
     (value.responsive === undefined || isResponsiveAuditResult(value.responsive)) &&
     typeof value.limits.maxLinks === 'number' &&
     typeof value.limits.maxResources === 'number' &&
-    summaryFields.every((field) => typeof value.summary[field] === 'number') &&
+    summaryFields.every((field) => typeof summary[field] === 'number') &&
     value.issues.every((issue) =>
       isRecord(issue) &&
       typeof issue.category === 'string' &&

@@ -158,8 +158,8 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver todas no relatório' }));
 
     expect(screen.getByRole('heading', { name: 'Relatório' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Categoria' }))
-      .toHaveValue('accessibility');
+    expect(screen.getByRole('button', { name: /Acessibilidade/ }))
+      .toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox', { name: 'Buscar' }))
       .toHaveValue('IMAGE_ALT_MISSING');
     expect(screen.getByText(

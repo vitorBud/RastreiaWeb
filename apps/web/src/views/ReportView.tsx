@@ -37,7 +37,7 @@ const reportCategories: Array<{
 }> = [
   { category: 'link', className: 'violet', description: 'Erros HTTP, bloqueios e redirecionamentos' },
   { category: 'responsive', className: 'blue', description: 'Quebras por largura e elementos fora da tela' },
-  { category: 'accessibility', className: 'green', description: 'Imagens sem alt e barreiras automáticas' },
+  { category: 'accessibility', className: 'green', description: 'Imagens sem alt com localização detalhada' },
   { category: 'resource', className: 'pink', description: 'Imagens, scripts e folhas de estilo' },
 ];
 
@@ -325,7 +325,7 @@ function exportReport(report: AuditReport) {
   const blob = new Blob([content], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
-  let exportHostname = 'pagina';
+  let exportHostname: string;
 
   try {
     exportHostname = new URL(report.finalUrl).hostname.replace(/[^a-z0-9.-]/gi, '-');

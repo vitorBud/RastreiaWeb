@@ -541,4 +541,5 @@ describe('auditPage', () => {
     );
     expect(report.responsive?.styleCoverage).toEqual({ discovered: 1, loaded: 1 });
   });
+
 });

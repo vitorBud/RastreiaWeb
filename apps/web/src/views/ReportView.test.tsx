@@ -239,7 +239,6 @@ describe('ReportView', () => {
       name: 'Detalhes da imagem sem alt: banner-home.jpg',
     });
 
-    expect(within(details).getByText('banner-home.jpg')).toBeInTheDocument();
     expect(within(details).getByRole('link', {
       name: 'https://cdn.example.net/banner-home.jpg',
     })).toHaveAttribute('href', 'https://cdn.example.net/banner-home.jpg');

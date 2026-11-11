@@ -100,7 +100,7 @@ describe('loadAuditHistory', () => {
         unavailableLinks: 0,
         unreachableLinks: 0,
       },
-    } as AuditReport;
+    } as unknown as AuditReport;
 
     saveAuditHistory([report]);
 

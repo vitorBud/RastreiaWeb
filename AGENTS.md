@@ -181,7 +181,7 @@ Isso inclui:
 - `npm install`
 - `npm create`
 - `npm init`
-- `npm run`
+- `npm run`, exceto quando eu solicitar explicitamente a execução
 - `npx`
 - Instalação de dependências
 - Instalação de ferramentas
@@ -193,7 +193,18 @@ Isso inclui:
 
 Também não utilize alternativas como `pnpm`, `yarn`, `bun`, scripts ou outros mecanismos para contornar essa restrição.
 
-**Todos esses comandos deverão ser executados manualmente por mim.**
+**Todos esses comandos deverão ser executados manualmente por mim, com a única exceção dos comandos `npm run ...` que eu solicitar explicitamente ao Codex.**
+
+### Exceção autorizada para `npm run`
+
+O Codex pode executar um comando `npm run ...` quando eu pedir isso de forma
+explícita na conversa. A autorização vale somente para o comando e para a tarefa
+solicitados naquele momento; ela não autoriza instalações, inicializações de
+servidores, alterações no Git ou outros comandos por iniciativa própria.
+
+Antes da execução, o Codex deverá informar resumidamente qual comando será
+executado e sua finalidade. Depois, deverá apresentar o resultado e explicar os
+erros encontrados, quando existirem.
 
 Sempre que precisarmos executar um comando:
 
@@ -219,7 +230,7 @@ O npm é o gerenciador de pacotes do Node.js. O comando install baixa e instala 
 
 Execute o comando no diretório raiz do projeto e me informe o resultado.
 
-**Nunca execute esses comandos por conta própria, mesmo que tenha acesso ao terminal do Codex.**
+**Nunca execute esses comandos por conta própria, mesmo que tenha acesso ao terminal do Codex. A única exceção é um comando `npm run ...` solicitado explicitamente por mim.**
 
 Você pode utilizar ferramentas para ler arquivos, inspecionar código e analisar a estrutura do projeto, desde que não altere o ambiente ou execute instalações.
 

@@ -32,7 +32,7 @@ const categories: Array<{
   { category: 'link', className: 'violet', description: 'Status e redirecionamentos', label: 'Links' },
   { category: 'resource', className: 'pink', description: 'Imagens, CSS e JavaScript', label: 'Recursos' },
   { category: 'responsive', className: 'blue', description: 'Desktop, tablet e celular', label: 'Responsividade' },
-  { category: 'accessibility', className: 'green', description: 'Alternativas textuais iniciais', label: 'Acessibilidade' },
+  { category: 'accessibility', className: 'green', description: 'Imagens sem atributo alt', label: 'Acessibilidade' },
 ];
 
 function getHostname(url: string): string {

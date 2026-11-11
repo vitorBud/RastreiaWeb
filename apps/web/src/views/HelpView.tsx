@@ -38,7 +38,8 @@ export function HelpView() {
           <li>A responsividade mede overflow horizontal e elementos fora da viewport em desktop, tablet e celular.</li>
           <li>O relatório informa a largura testada, o excesso em pixels e o elemento HTML relacionado.</li>
           <li>A análise não identifica sozinha todos os problemas visuais; sobreposições e legibilidade ainda exigem revisão manual.</li>
-          <li>As regras completas do axe-core entrarão nas próximas versões.</li>
+          <li>A verificação de acessibilidade atual é focada em imagens sem alt, com URL, página de origem e HTML detalhados.</li>
+          <li>Contraste, teclado, leitores de tela, semântica e compreensão do conteúdo ainda precisam de avaliação manual.</li>
           <li>Sites que bloqueiam requisições automatizadas podem retornar resultados inconclusivos.</li>
           <li>Respostas 401, 403 e 429 são inconclusivas e devem ser confirmadas manualmente.</li>
           <li>Todos os links do HTML estático são listados, mas somente a quantidade configurada de destinos HTTP únicos recebe requisições.</li>
